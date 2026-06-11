@@ -1,0 +1,2267 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Чемпионат Прогнозов ЧМ (48 команд)</title>
+  <!-- Tailwind CSS -->
+  <script src="https://cdn.tailwindcss.com"></script>
+  <!-- Font Awesome Icons -->
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+  <!-- Google Fonts -->
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
+  
+  <!-- React and ReactDOM -->
+  <script src="https://unpkg.com/react@18/umd/react.production.min.js" crossorigin></script>
+  <script src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js" crossorigin></script>
+  <!-- Babel for JSX -->
+  <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+
+  <!-- Firebase legacy compat wrappers inside sandboxed environment -->
+  <script src="https://www.gstatic.com/firebasejs/11.1.0/firebase-app-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/11.1.0/firebase-auth-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/11.1.0/firebase-firestore-compat.js"></script>
+
+  <style>
+    body {
+      font-family: 'Inter', sans-serif;
+      background-color: #0f172a;
+      color: #f8fafc;
+    }
+    ::-webkit-scrollbar {
+      width: 6px;
+      height: 6px;
+    }
+    ::-webkit-scrollbar-track {
+      background: #1e293b;
+    }
+    ::-webkit-scrollbar-thumb {
+      background: #475569;
+      border-radius: 4px;
+    }
+    ::-webkit-scrollbar-thumb:hover {
+      background: #10b981;
+    }
+    input[type="number"]::-webkit-inner-spin-button,
+    input[type="number"]::-webkit-outer-spin-button {
+      -webkit-appearance: none;
+      margin: 0;
+    }
+  </style>
+</head>
+<body class="min-h-screen">
+
+  <div id="root"></div>
+
+  <script type="text/babel">
+    const { useState, useEffect, useMemo } = React;
+
+    // --- STATIC DATA: 48 TEAMS (WORLD CUP 2026 ACTUAL USER GROUPS) ---
+    const TEAMS = {
+      // Группа A
+      MEX: { code: 'MEX', name: 'Мексика', group: 'A', flag: '🇲🇽' },
+      RSA: { code: 'RSA', name: 'ЮАР', group: 'A', flag: '🇿🇦' },
+      KOR: { code: 'KOR', name: 'Южная Корея', group: 'A', flag: '🇰🇷' },
+      CZE: { code: 'CZE', name: 'Чехия', group: 'A', flag: '🇨🇿' },
+      // Группа B
+      CAN: { code: 'CAN', name: 'Канада', group: 'B', flag: '🇨🇦' },
+      BIH: { code: 'BIH', name: 'Босния и Герц.', group: 'B', flag: '🇧🇦' },
+      QAT: { code: 'QAT', name: 'Катар', group: 'B', flag: '🇶🇦' },
+      SUI: { code: 'SUI', name: 'Швейцария', group: 'B', flag: '🇨🇭' },
+      // Группа C
+      BRA: { code: 'BRA', name: 'Бразилия', group: 'C', flag: '🇧🇷' },
+      MAR: { code: 'MAR', name: 'Марокко', group: 'C', flag: '🇲🇦' },
+      HAI: { code: 'HAI', name: 'Гаити', group: 'C', flag: '🇭🇹' },
+      SCO: { code: 'SCO', name: 'Шотландия', group: 'C', flag: '🏴󠁧󠁢󠁳󠁣󠁴󠁿' },
+      // Группа D
+      USA: { code: 'USA', name: 'США', group: 'D', flag: '🇺🇸' },
+      PAR: { code: 'PAR', name: 'Парагвай', group: 'D', flag: '🇵🇾' },
+      AUS: { code: 'AUS', name: 'Австралия', group: 'D', flag: '🇦🇺' },
+      TUR: { code: 'TUR', name: 'Турция', group: 'D', flag: '🇹🇷' },
+      // Группа E
+      GER: { code: 'GER', name: 'Германия', group: 'E', flag: '🇩🇪' },
+      CUW: { code: 'CUW', name: 'Кюрасао', group: 'E', flag: '🇨🇼' },
+      CIV: { code: 'CIV', name: 'Кот-д\'Ивуар', group: 'E', flag: '🇨🇮' },
+      ECU: { code: 'ECU', name: 'Эквадор', group: 'E', flag: '🇪🇨' },
+      // Группа F
+      NED: { code: 'NED', name: 'Нидерланды', group: 'F', flag: '🇳🇱' },
+      JPN: { code: 'JPN', name: 'Япония', group: 'F', flag: '🇯🇵' },
+      SWE: { code: 'SWE', name: 'Швеция', group: 'F', flag: '🇸🇪' },
+      TUN: { code: 'TUN', name: 'Тунис', group: 'F', flag: '🇹🇳' },
+      // Группа G
+      BEL: { code: 'BEL', name: 'Бельгия', group: 'G', flag: '🇧🇪' },
+      EGY: { code: 'EGY', name: 'Египет', group: 'G', flag: '🇪🇬' },
+      IRN: { code: 'IRN', name: 'Иран', group: 'G', flag: '🇮🇷' },
+      NZL: { code: 'NZL', name: 'Новая Зеландия', group: 'G', flag: '🇳🇿' },
+      // Группа H
+      ESP: { code: 'ESP', name: 'Испания', group: 'H', flag: '🇪🇸' },
+      CPV: { code: 'CPV', name: 'Кабо-Верде', group: 'H', flag: '🇨🇻' },
+      KSA: { code: 'KSA', name: 'Сауд. Аравия', group: 'H', flag: '🇸🇦' },
+      URU: { code: 'URU', name: 'Уругвай', group: 'H', flag: '🇺🇾' },
+      // Группа I
+      FRA: { code: 'FRA', name: 'Франция', group: 'I', flag: '🇫🇷' },
+      SEN: { code: 'SEN', name: 'Сенегал', group: 'I', flag: '🇸🇳' },
+      IRQ: { code: 'IRQ', name: 'Ирак', group: 'I', flag: '🇮🇶' },
+      NOR: { code: 'NOR', name: 'Норвегия', group: 'I', flag: '🇳🇴' },
+      // Группа J
+      ARG: { code: 'ARG', name: 'Аргентина', group: 'J', flag: '🇦🇷' },
+      ALG: { code: 'ALG', name: 'Алжир', group: 'J', flag: '🇩🇿' },
+      AUT: { code: 'AUT', name: 'Австрия', group: 'J', flag: '🇦🇹' },
+      JOR: { code: 'JOR', name: 'Иордания', group: 'J', flag: '🇯🇴' },
+      // Группа K
+      POR: { code: 'POR', name: 'Португалия', group: 'K', flag: '🇵🇹' },
+      COD: { code: 'COD', name: 'ДР Конго', group: 'K', flag: '🇨🇩' },
+      UZB: { code: 'UZB', name: 'Узбекистан', group: 'K', flag: '🇺🇿' },
+      COL: { code: 'COL', name: 'Колумбия', group: 'K', flag: '🇨🇴' },
+      // Группа L
+      ENG: { code: 'ENG', name: 'Англия', group: 'L', flag: '🏴󠁧󠁢󠁥󠁮󠁧󠁿' },
+      CRO: { code: 'CRO', name: 'Хорватия', group: 'L', flag: '🇭🇷' },
+      GHA: { code: 'GHA', name: 'Гана', group: 'L', flag: '🇬🇭' },
+      PAN: { code: 'PAN', name: 'Панама', group: 'L', flag: '🇵🇦' },
+    };
+
+    // --- GENERATE ALL MATCHES DYNAMICALLY WITH DETAILED METADATA ---
+    const generateStaticMatches = () => {
+      const baseMatches = [];
+      const groups = ['A', 'B', 'C', 'D', 'E', 'F', 'G', 'H', 'I', 'J', 'K', 'L'];
+      groups.forEach(g => {
+        const gTeams = Object.keys(TEAMS).filter(k => TEAMS[k].group === g);
+        if (gTeams.length === 4) {
+          const [t1, t2, t3, t4] = gTeams;
+          baseMatches.push({ id: `${g}1`, group: g, home: t1, away: t2, label: 'Тур 1' });
+          baseMatches.push({ id: `${g}2`, group: g, home: t3, away: t4, label: 'Тур 1' });
+          baseMatches.push({ id: `${g}3`, group: g, home: t1, away: t3, label: 'Тур 2' });
+          baseMatches.push({ id: `${g}4`, group: g, home: t2, away: t4, label: 'Тур 2' });
+          baseMatches.push({ id: `${g}5`, group: g, home: t4, away: t1, label: 'Тур 3' });
+          baseMatches.push({ id: `${g}6`, group: g, home: t2, away: t3, label: 'Тур 3' });
+        }
+      });
+
+      const scheduleMap = {
+        'A1': { date: '11 июня', time: '22:00', city: 'Мехико' },
+        'A2': { date: '12 июня', time: '05:00', city: 'Гвадалахара' },
+        'B1': { date: '12 июня', time: '22:00', city: 'Торонто' },
+        'B2': { date: '13 июня', time: '22:00', city: 'Санта-Клара' },
+        'C1': { date: '14 июня', time: '01:00', city: 'Ист-Ратерфорд' },
+        'C2': { date: '14 июня', time: '04:00', city: 'Фоксборо' },
+        'D1': { date: '13 июня', time: '04:00', city: 'Инглвуд' },
+        'D2': { date: '14 июня', time: '07:00', city: 'Ванкувер' },
+        'E1': { date: '14 июня', time: '20:00', city: 'Хьюстон' },
+        'E2': { date: '15 июня', time: '02:00', city: 'Филадельфия' },
+        'F1': { date: '14 июня', time: '23:00', city: 'Арлингтон' },
+        'F2': { date: '15 июня', time: '05:00', city: 'Гуадалупе' },
+        'G1': { date: '15 июня', time: '22:00', city: 'Сиэтл' },
+        'G2': { date: '16 июня', time: '04:00', city: 'Инглвуд' },
+        'H1': { date: '15 июня', time: '19:00', city: 'Атланта' },
+        'H2': { date: '16 июня', time: '01:00', city: 'Майами-Гарденс' },
+        'I1': { date: '16 июня', time: '22:00', city: 'Ист-Ратерфорд' },
+        'I2': { date: '17 июня', time: '01:00', city: 'Фоксборо' },
+        'J1': { date: '17 июня', time: '04:00', city: 'Канзас-Сити' },
+        'J2': { date: '17 июня', time: '07:00', city: 'Санта-Клара' },
+        'K1': { date: '17 июня', time: '20:00', city: 'Хьюстон' },
+        'K2': { date: '18 июня', time: '05:00', city: 'Мехико' },
+        'L1': { date: '17 июня', time: '23:00', city: 'Арлингтон' },
+        'L2': { date: '18 июня', time: '02:00', city: 'Торонто' },
+
+        'A3': { date: '19 июня', time: '04:00', city: 'Сапопан' },
+        'A4': { date: '18 июня', time: '19:00', city: 'Атланта' },
+        'B3': { date: '19 июня', time: '01:00', city: 'Ванкувер' },
+        'B4': { date: '18 июня', time: '22:00', city: 'Инглвуд' },
+        'C3': { date: '20 июня', time: '04:00', city: 'Филадельфия' },
+        'C4': { date: '20 июня', time: '01:00', city: 'Фоксборо' },
+        'D3': { date: '19 июня', time: '22:00', city: 'Сиэтл' },
+        'D4': { date: '20 июня', time: '07:00', city: 'Санта-Клара' },
+        'F3': { date: '20 июня', time: '20:00', city: 'Хьюстон' },
+
+        'E3': { date: '21 июня', time: '01:00', city: 'Филадельфия' },
+        'E4': { date: '21 июня', time: '04:00', city: 'Хьюстон' },
+        'F4': { date: '21 июня', time: '07:00', city: 'Гуадалупе' },
+        'G3': { date: '21 июня', time: '20:00', city: 'Сиэтл' },
+        'G4': { date: '21 июня', time: '23:00', city: 'Инглвуд' },
+        'H3': { date: '22 июня', time: '01:00', city: 'Атланта' },
+        'H4': { date: '22 июня', time: '04:00', city: 'Майами-Гарденс' },
+        'I3': { date: '22 июня', time: '20:00', city: 'Ист-Ратерфорд' },
+        'I4': { date: '22 июня', time: '23:00', city: 'Фоксборо' },
+        'J3': { date: '23 июня', time: '01:00', city: 'Канзас-Сити' },
+        'J4': { date: '23 июня', time: '04:00', city: 'Санта-Клара' },
+        'K3': { date: '23 июня', time: '20:00', city: 'Хьюстон' },
+        'K4': { date: '23 июня', time: '23:00', city: 'Мехико' },
+        'L3': { date: '24 июня', time: '01:00', city: 'Арлингтон' },
+        'L4': { date: '24 июня', time: '04:00', city: 'Торонто' },
+
+        'A5': { date: '25 июня', time: '19:00', city: 'Мехико' },
+        'A6': { date: '25 июня', time: '19:00', city: 'Гвадалахара' },
+        'B5': { date: '25 июня', time: '22:00', city: 'Торонто' },
+        'B6': { date: '25 июня', time: '22:00', city: 'Санта-Клара' },
+        'C5': { date: '26 июня', time: '19:00', city: 'Ист-Ратерфорд' },
+        'C6': { date: '26 июня', time: '19:00', city: 'Фоксборо' },
+        'D5': { date: '26 июня', time: '22:00', city: 'Инглвуд' },
+        'D6': { date: '26 июня', time: '22:00', city: 'Ванкувер' },
+        'E5': { date: '27 июня', time: '19:00', city: 'Хьюстон' },
+        'E6': { date: '27 июня', time: '19:00', city: 'Филадельфия' },
+        'F5': { date: '27 июня', time: '22:00', city: 'Арлингтон' },
+        'F6': { date: '27 июня', time: '22:00', city: 'Гуадалупе' },
+        'G5': { date: '28 июня', time: '19:00', city: 'Сиэтл' },
+        'G6': { date: '28 июня', time: '19:00', city: 'Инглвуд' },
+        'H5': { date: '28 июня', time: '22:00', city: 'Атланта' },
+        'H6': { date: '28 июня', time: '22:00', city: 'Майами-Гарденс' },
+        'I5': { date: '29 июня', time: '19:00', city: 'Ист-Ратерфорд' },
+        'I6': { date: '29 июня', time: '19:00', city: 'Фоксборо' },
+        'J5': { date: '29 июня', time: '22:00', city: 'Канзас-Сити' },
+        'J6': { date: '29 июня', time: '22:00', city: 'Санта-Клара' },
+        'K5': { date: '30 июня', time: '19:00', city: 'Хьюстон' },
+        'K6': { date: '30 июня', time: '19:00', city: 'Мехико' },
+        'L5': { date: '30 июня', time: '22:00', city: 'Арлингтон' },
+        'L6': { date: '30 июня', time: '22:00', city: 'Торонто' },
+      };
+
+      return baseMatches.map(m => {
+        const sched = scheduleMap[m.id] || { date: 'Тур 3', time: '20:00', city: 'Нейтральное поле' };
+        return {
+          ...m,
+          date: sched.date,
+          time: sched.time,
+          city: sched.city
+        };
+      });
+    };
+
+    const STATIC_MATCHES = generateStaticMatches();
+
+    // --- CALCULATE STANDINGS & TOP 3rd PLACES ---
+    function calculateStandings(matchesData) {
+      const standings = {};
+      const groupNames = ['A', 'B', 'C', 'D', 'E', 'F', 'G', 'H', 'I', 'J', 'K', 'L'];
+      groupNames.forEach(g => { standings[g] = []; });
+
+      const teamStats = {};
+      Object.keys(TEAMS).forEach(code => {
+        teamStats[code] = {
+          ...TEAMS[code],
+          played: 0, win: 0, draw: 0, loss: 0, gf: 0, ga: 0, gd: 0, pts: 0
+        };
+      });
+
+      STATIC_MATCHES.forEach(m => {
+        const pred = matchesData[m.id];
+        if (pred && pred.home !== undefined && pred.away !== undefined && pred.home !== '' && pred.away !== '') {
+          const hG = parseInt(pred.home);
+          const aG = parseInt(pred.away);
+
+          if (!isNaN(hG) && !isNaN(aG)) {
+            teamStats[m.home].played++;
+            teamStats[m.away].played++;
+            teamStats[m.home].gf += hG;
+            teamStats[m.home].ga += aG;
+            teamStats[m.away].gf += aG;
+            teamStats[m.away].ga += hG;
+
+            if (hG > aG) {
+              teamStats[m.home].win++;
+              teamStats[m.home].pts += 3;
+              teamStats[m.away].loss++;
+            } else if (hG < aG) {
+              teamStats[m.away].win++;
+              teamStats[m.away].pts += 3;
+              teamStats[m.home].loss++;
+            } else {
+              teamStats[m.home].draw++;
+              teamStats[m.away].draw++;
+              teamStats[m.home].pts += 1;
+              teamStats[m.away].pts += 1;
+            }
+          }
+        }
+      });
+
+      Object.keys(teamStats).forEach(code => {
+        const team = teamStats[code];
+        team.gd = team.gf - team.ga;
+        standings[team.group].push(team);
+      });
+
+      // Sort each group
+      Object.keys(standings).forEach(g => {
+        standings[g].sort((a, b) => {
+          if (b.pts !== a.pts) return b.pts - a.pts;
+          if (b.gd !== a.gd) return b.gd - a.gd;
+          if (b.gf !== a.gf) return b.gf - a.gf;
+          return a.name.localeCompare(b.name);
+        });
+      });
+
+      // Extract 3rd placed teams and sort them
+      const thirdPlaced = [];
+      Object.keys(standings).forEach(g => {
+        if (standings[g][2]) {
+          thirdPlaced.push(standings[g][2]);
+        }
+      });
+
+      thirdPlaced.sort((a, b) => {
+        if (b.pts !== a.pts) return b.pts - a.pts;
+        if (b.gd !== a.gd) return b.gd - a.gd;
+        if (b.gf !== a.gf) return b.gf - a.gf;
+        return a.name.localeCompare(b.name);
+      });
+
+      // 8 best 3rd placed teams advance
+      const best3rd = thirdPlaced.slice(0, 8);
+
+      const advancing = [];
+      Object.keys(standings).forEach(g => {
+        advancing.push(standings[g][0].code); // 1st
+        advancing.push(standings[g][1].code); // 2nd
+      });
+      best3rd.forEach(t => advancing.push(t.code));
+
+      return {
+        standings,
+        thirdPlaced,
+        best3rd: best3rd.map(t => t.code),
+        advancing
+      };
+    }
+
+    // Determine Knockout 1/16 pairings (Round of 32 matches)
+    function getKnockoutPairings(standings, best3rdCodes) {
+      const sorted3rd = [...best3rdCodes].sort(); 
+
+      const getTeam = (group, pos) => standings[group]?.[pos] || { code: `?-${group}${pos+1}`, name: `${pos+1}-е место Гр. ${group}`, flag: '⚽' };
+      const get3rd = (index) => {
+        const code = sorted3rd[index];
+        return TEAMS[code] || { code: `?_3rd_${index}`, name: `3-е место #${index+1}`, flag: '⚽' };
+      };
+
+      return {
+        R32_1: [getTeam('A', 0), get3rd(0)],        
+        R32_2: [getTeam('B', 1), getTeam('C', 1)], 
+        R32_3: [getTeam('C', 0), get3rd(1)],        
+        R32_4: [getTeam('D', 1), getTeam('E', 1)], 
+        R32_5: [getTeam('E', 0), get3rd(2)],        
+        R32_6: [getTeam('F', 1), getTeam('G', 1)], 
+        R32_7: [getTeam('G', 0), get3rd(3)],        
+        R32_8: [getTeam('H', 1), getTeam('I', 1)], 
+        R32_9: [getTeam('I', 0), get3rd(4)],        
+        R32_10: [getTeam('J', 1), getTeam('K', 1)], 
+        R32_11: [getTeam('K', 0), get3rd(5)],        
+        R32_12: [getTeam('L', 1), getTeam('A', 1)], 
+        R32_13: [getTeam('B', 0), get3rd(6)],        
+        R32_14: [getTeam('F', 0), getTeam('D', 0)], 
+        R32_15: [getTeam('H', 0), getTeam('J', 0)], 
+        R32_16: [getTeam('L', 0), get3rd(7)]         
+      };
+    }
+
+    // Resolve the entire bracket (1/16 -> Champion)
+    function resolveWholeBracket(matches, koChoices) {
+      const { standings, best3rd, advancing } = calculateStandings(matches);
+      const r32Matches = getKnockoutPairings(standings, best3rd);
+
+      const getWinner = (matchId, t1, t2) => {
+        if (!t1 || !t2 || t1.code.startsWith('?') || t2.code.startsWith('?')) return null;
+        const choice = koChoices[matchId];
+        if (choice === t1.code || choice === t2.code) return choice;
+        return null; 
+      };
+
+      const getR32WinnerTeam = (r32Id, placeholderName) => {
+        const pair = r32Matches[r32Id];
+        if (!pair) return { code: `?_${r32Id}`, name: placeholderName, flag: '⚽' };
+        const wCode = getWinner(r32Id, pair[0], pair[1]);
+        return TEAMS[wCode] || { code: `?_${r32Id}`, name: placeholderName, flag: '⚽' };
+      };
+
+      const r16Matches = {
+        R16_1: [getR32WinnerTeam('R32_1', 'Поб. 1/16 #1'), getR32WinnerTeam('R32_2', 'Поб. 1/16 #2')],
+        R16_2: [getR32WinnerTeam('R32_3', 'Поб. 1/16 #3'), getR32WinnerTeam('R32_4', 'Поб. 1/16 #4')],
+        R16_3: [getR32WinnerTeam('R32_5', 'Поб. 1/16 #5'), getR32WinnerTeam('R32_6', 'Поб. 1/16 #6')],
+        R16_4: [getR32WinnerTeam('R32_7', 'Поб. 1/16 #7'), getR32WinnerTeam('R32_8', 'Поб. 1/16 #8')],
+        R16_5: [getR32WinnerTeam('R32_9', 'Поб. 1/16 #9'), getR32WinnerTeam('R32_10', 'Поб. 1/16 #10')],
+        R16_6: [getR32WinnerTeam('R32_11', 'Поб. 1/16 #11'), getR32WinnerTeam('R32_12', 'Поб. 1/16 #12')],
+        R16_7: [getR32WinnerTeam('R32_13', 'Поб. 1/16 #13'), getR32WinnerTeam('R32_14', 'Поб. 1/16 #14')],
+        R16_8: [getR32WinnerTeam('R32_15', 'Поб. 1/16 #15'), getR32WinnerTeam('R32_16', 'Поб. 1/16 #16')],
+      };
+
+      const getR16WinnerTeam = (r16Id, placeholderName) => {
+        const pair = r16Matches[r16Id];
+        if (!pair) return { code: `?_${r16Id}`, name: placeholderName, flag: '⚽' };
+        const wCode = getWinner(r16Id, pair[0], pair[1]);
+        return TEAMS[wCode] || { code: `?_${r16Id}`, name: placeholderName, flag: '⚽' };
+      };
+
+      const qfMatches = {
+        QF_1: [getR16WinnerTeam('R16_1', 'Поб. 1/8 #1'), getR16WinnerTeam('R16_2', 'Поб. 1/8 #2')],
+        QF_2: [getR16WinnerTeam('R16_3', 'Поб. 1/8 #3'), getR16WinnerTeam('R16_4', 'Поб. 1/8 #4')],
+        QF_3: [getR16WinnerTeam('R16_5', 'Поб. 1/8 #5'), getR16WinnerTeam('R16_6', 'Поб. 1/8 #6')],
+        QF_4: [getR16WinnerTeam('R16_7', 'Поб. 1/8 #7'), getR16WinnerTeam('R16_8', 'Поб. 1/8 #8')],
+      };
+
+      const getQFWinnerTeam = (qfId, placeholderName) => {
+        const pair = qfMatches[qfId];
+        if (!pair) return { code: `?_${qfId}`, name: placeholderName, flag: '⚽' };
+        const wCode = getWinner(qfId, pair[0], pair[1]);
+        return TEAMS[wCode] || { code: `?_${qfId}`, name: placeholderName, flag: '⚽' };
+      };
+
+      const sfMatches = {
+        SF_1: [getQFWinnerTeam('QF_1', 'Поб. 1/4 #1'), getQFWinnerTeam('QF_2', 'Поб. 1/4 #2')],
+        SF_2: [getQFWinnerTeam('QF_3', 'Поб. 1/4 #3'), getQFWinnerTeam('QF_4', 'Поб. 1/4 #4')],
+      };
+
+      const getSFWinnerTeam = (sfId, placeholderName) => {
+        const pair = sfMatches[sfId];
+        if (!pair) return { code: `?_${sfId}`, name: placeholderName, flag: '⚽' };
+        const wCode = getWinner(sfId, pair[0], pair[1]);
+        return TEAMS[wCode] || { code: `?_${sfId}`, name: placeholderName, flag: '⚽' };
+      };
+
+      const finalMatches = {
+        FINAL: [getSFWinnerTeam('SF_1', 'Поб. 1/2 #1'), getSFWinnerTeam('SF_2', 'Поб. 1/2 #2')],
+      };
+
+      const finalPair = finalMatches.FINAL;
+      const championCode = getWinner('FINAL', finalPair[0], finalPair[1]);
+
+      const getCodes = (arr) => arr.filter(t => t && !t.code.startsWith('?')).map(t => t.code);
+
+      return {
+        advancing, 
+        r32Matches,
+        r32: advancing,
+        r16Matches,
+        r16: getCodes([
+          getR32WinnerTeam('R32_1', ''), getR32WinnerTeam('R32_2', ''), getR32WinnerTeam('R32_3', ''), getR32WinnerTeam('R32_4', ''),
+          getR32WinnerTeam('R32_5', ''), getR32WinnerTeam('R32_6', ''), getR32WinnerTeam('R32_7', ''), getR32WinnerTeam('R32_8', ''),
+          getR32WinnerTeam('R32_9', ''), getR32WinnerTeam('R32_10', ''), getR32WinnerTeam('R32_11', ''), getR32WinnerTeam('R32_12', ''),
+          getR32WinnerTeam('R32_13', ''), getR32WinnerTeam('R32_14', ''), getR32WinnerTeam('R32_15', ''), getR32WinnerTeam('R32_16', '')
+        ]),
+        qfMatches,
+        qf: getCodes([
+          getR16WinnerTeam('R16_1', ''), getR16WinnerTeam('R16_2', ''), getR16WinnerTeam('R16_3', ''), getR16WinnerTeam('R16_4', ''),
+          getR16WinnerTeam('R16_5', ''), getR16WinnerTeam('R16_6', ''), getR16WinnerTeam('R16_7', ''), getR16WinnerTeam('R16_8', '')
+        ]),
+        sfMatches,
+        sf: getCodes([
+          getQFWinnerTeam('QF_1', ''), getQFWinnerTeam('QF_2', ''), getQFWinnerTeam('QF_3', ''), getQFWinnerTeam('QF_4', '')
+        ]),
+        finalMatches,
+        f: getCodes([
+          getSFWinnerTeam('SF_1', ''), getSFWinnerTeam('SF_2', '')
+        ]),
+        champion: championCode
+      };
+    }
+
+    // --- SCORING CALCULATION ENGINE ---
+    function calculateUserScore(userPred, realResults) {
+      let matchPoints = 0;
+      let groupTeamsPoints = 0;
+      let koPoints = 0;
+
+      let score3 = 0; 
+      let score2 = 0; 
+      let score1 = 0; 
+
+      const realMatches = realResults?.matches || {};
+      const predMatches = userPred?.matches || {};
+
+      // 1. Group stage match point calculations
+      STATIC_MATCHES.forEach(m => {
+        const real = realMatches[m.id];
+        const pred = predMatches[m.id];
+
+        if (real && real.home !== undefined && real.away !== undefined && real.home !== '' && real.away !== '') {
+          if (pred && pred.home !== undefined && pred.away !== undefined && pred.home !== '' && pred.away !== '') {
+            const rH = parseInt(real.home);
+            const rA = parseInt(real.away);
+            const pH = parseInt(pred.home);
+            const pA = parseInt(pred.away);
+
+            if (!isNaN(rH) && !isNaN(rA) && !isNaN(pH) && !isNaN(pA)) {
+              if (pH === rH && pA === rA) {
+                matchPoints += 3;
+                score3++;
+              } else {
+                const rWin = rH > rA ? 1 : (rH < rA ? -1 : 0);
+                const pWin = pH > pA ? 1 : (pH < pA ? -1 : 0);
+
+                if (rWin === pWin) {
+                  const rDiff = rH - rA;
+                  const pDiff = pH - pA;
+                  if (rDiff === pDiff) {
+                    matchPoints += 2;
+                    score2++;
+                  } else {
+                    matchPoints += 1;
+                    score1++;
+                  }
+                }
+              }
+            }
+          }
+        }
+      });
+
+      // 2. Advancing group outcome & Knockouts ONLY calculated if group stage is fully completed
+      const isGroupStageFinished = STATIC_MATCHES.every(m => {
+        const real = realMatches[m.id];
+        return real && real.home !== undefined && real.away !== undefined && real.home !== '' && real.away !== '';
+      });
+
+      let correctAdvancingCount = 0;
+      let r16Points = 0;
+      let qfPoints = 0;
+      let sfPoints = 0;
+      let fPoints = 0;
+      let champPoints = 0;
+
+      if (isGroupStageFinished) {
+        const realStages = resolveWholeBracket(realMatches, realResults?.ko || {});
+        const predStages = resolveWholeBracket(predMatches, userPred?.ko || {});
+
+        // Clean dummy teams starting with '?' before awarding points
+        const cleanRealR32 = (realStages.r32 || []).filter(code => code && !code.startsWith('?'));
+        const cleanRealR16 = (realStages.r16 || []).filter(code => code && !code.startsWith('?'));
+        const cleanRealQf = (realStages.qf || []).filter(code => code && !code.startsWith('?'));
+        const cleanRealSf = (realStages.sf || []).filter(code => code && !code.startsWith('?'));
+        const cleanRealF = (realStages.f || []).filter(code => code && !code.startsWith('?'));
+        const cleanRealChamp = (realStages.champion && !realStages.champion.startsWith('?')) ? realStages.champion : null;
+
+        if (cleanRealR32.length > 0) {
+          predStages.r32.forEach(code => {
+            if (cleanRealR32.includes(code)) {
+              groupTeamsPoints += 5;
+              correctAdvancingCount++;
+            }
+          });
+        }
+
+        if (cleanRealR16.length > 0) {
+          predStages.r16.forEach(code => {
+            if (cleanRealR16.includes(code)) r16Points += 7;
+          });
+        }
+
+        if (cleanRealQf.length > 0) {
+          predStages.qf.forEach(code => {
+            if (cleanRealQf.includes(code)) qfPoints += 8;
+          });
+        }
+
+        if (cleanRealSf.length > 0) {
+          predStages.sf.forEach(code => {
+            if (cleanRealSf.includes(code)) sfPoints += 9;
+          });
+        }
+
+        if (cleanRealF.length > 0) {
+          predStages.f.forEach(code => {
+            if (cleanRealF.includes(code)) fPoints += 10;
+          });
+        }
+
+        if (cleanRealChamp && predStages.champion === cleanRealChamp) {
+          champPoints = 13;
+        }
+      }
+
+      koPoints = r16Points + qfPoints + sfPoints + fPoints + champPoints;
+      const totalPoints = matchPoints + groupTeamsPoints + koPoints;
+
+      return {
+        totalPoints,
+        matchPoints,
+        groupTeamsPoints,
+        koPoints,
+        breakdown: {
+          score3, score2, score1,
+          correctAdvancingCount,
+          r16Points, qfPoints, sfPoints, fPoints, champPoints
+        }
+      };
+    }
+
+    // --- FIREBASE INITIALIZATION & CONSTANTS ---
+    const firebaseConfig = {
+      apiKey: "AIzaSyBnJH-xvU_5HEG-X62ji_Grq81KLbXlW_s",
+      authDomain: "ch2026-aca38.firebaseapp.com",
+      projectId: "ch2026-aca38",
+      storageBucket: "ch2026-aca38.firebasestorage.app",
+      messagingSenderId: "672038319705",
+      appId: "1:672038319705:web:8e0ae61199dbfc582b6348",
+      measurementId: "G-M6MY1DC3QE"
+    };
+
+    // Инициализируем Firebase
+    firebase.initializeApp(firebaseConfig);
+
+    // Создаем глобальные переменные для связи с базой (без дубликатов let/const в других местах)
+    const db = firebase.firestore();
+    const auth = firebase.auth();
+    const appId = 'world-cup-predictor-48';
+    const firebaseEnabled = true; // Принудительно включаем синхронизацию с облаком
+
+    // --- MAIN REACT COMPONENT ---
+    function App() {
+      const [user, setUser] = useState(null);
+      const [userId, setUserId] = useState(null);
+      const [myProfile, setMyProfile] = useState({ username: '', registered: false });
+      const [myPredictions, setMyPredictions] = useState({ matches: {}, ko: {}, submitted: false });
+      const [realResults, setRealResults] = useState({ matches: {}, ko: {} });
+      const [allPredictions, setAllPredictions] = useState({});
+      const [allUsers, setAllUsers] = useState({});
+
+      const [activeTab, setActiveTab] = useState('predictions'); 
+      const [predGroupTab, setPredGroupTab] = useState('A'); 
+      const [koStageTab, setKoStageTab] = useState('R32'); 
+      const [adminGroupTab, setAdminGroupTab] = useState('A'); 
+      const [adminKoStageTab, setAdminKoStageTab] = useState('R32'); 
+
+      const [tempName, setTempName] = useState('');
+      const [isAdminMode, setIsAdminMode] = useState(false);
+      const [selectedPlayerDetailId, setSelectedPlayerDetailId] = useState(null);
+      const [saveStatus, setSaveStatus] = useState('');
+
+      // Custom dialog modal states
+      const [showSubmitConfirm, setShowSubmitConfirm] = useState(false);
+      const [submitWarningMsg, setSubmitWarningWarningMsg] = useState('');
+
+      // Admin password protect states
+      const [showAdminPasswordModal, setShowAdminPasswordModal] = useState(false);
+      const [adminPasswordInput, setAdminPasswordInput] = useState('');
+      const [adminPasswordError, setAdminPasswordError] = useState('');
+
+      // Auto Authentication (Rule 3)
+      useEffect(() => {
+        if (!firebaseEnabled) {
+          let localUid = localStorage.getItem('wc_mock_uid');
+          if (!localUid) {
+            localUid = 'player_' + Math.random().toString(36).substring(2, 9);
+            localStorage.setItem('wc_mock_uid', localUid);
+          }
+          setUserId(localUid);
+          setUser({ uid: localUid, isMock: true });
+          return;
+        }
+
+        const initAuth = async () => {
+          try {
+            if (typeof __initial_auth_token !== 'undefined' && __initial_auth_token) {
+              await auth.signInWithCustomToken(__initial_auth_token);
+            } else {
+              await auth.signInAnonymously();
+            }
+          } catch (err) {
+            console.error("Firebase auth failed, using anonymous fallback:", err);
+            try {
+              await auth.signInAnonymously();
+            } catch (fallbackErr) {
+              console.error("All Firebase auth attempts failed.", fallbackErr);
+            }
+          }
+        };
+        initAuth();
+
+        const unsubscribe = auth.onAuthStateChanged((u) => {
+          if (u) {
+            setUser(u);
+            setUserId(u.uid);
+          }
+        });
+        return () => unsubscribe();
+      }, []);
+
+      // Realtime Database Sync (Rule 1, Rule 2, Rule 3)
+      useEffect(() => {
+        if (!userId) return;
+
+        if (!firebaseEnabled) {
+          const offlinePreds = localStorage.getItem(`wc_preds_${userId}`);
+          const offlineProfile = localStorage.getItem(`wc_profile_${userId}`);
+          const offlineResults = localStorage.getItem('wc_results_global');
+
+          setMyPredictions(offlinePreds ? JSON.parse(offlinePreds) : { matches: {}, ko: {}, submitted: false });
+          setMyProfile(offlineProfile ? JSON.parse(offlineProfile) : { username: '', registered: false });
+          setRealResults(offlineResults ? JSON.parse(offlineResults) : { matches: {}, ko: {} });
+
+          setAllPredictions({ [userId]: offlinePreds ? JSON.parse(offlinePreds) : { matches: {}, ko: {}, submitted: false } });
+          setAllUsers({ [userId]: offlineProfile ? JSON.parse(offlineProfile) : { username: '', registered: false } });
+          return;
+        }
+
+        // Firebase Sync
+        const resultsRef = db.collection('artifacts').doc(appId).collection('public').doc('results').collection('data').doc('global');
+        const unsubResults = resultsRef.onSnapshot((docSnap) => {
+          if (docSnap.exists) {
+            setRealResults(docSnap.data());
+          } else {
+            resultsRef.set({ matches: {}, ko: {} });
+          }
+        }, err => console.error("Error results sync:", err));
+
+        const myPredRef = db.collection('artifacts').doc(appId).collection('public').doc('data').collection('predictions').doc(userId);
+        const unsubMyPreds = myPredRef.onSnapshot((docSnap) => {
+          if (docSnap.exists) {
+            setMyPredictions(docSnap.data());
+          } else {
+            const defaultPreds = { matches: {}, ko: {}, submitted: false };
+            myPredRef.set(defaultPreds);
+            setMyPredictions(defaultPreds);
+          }
+        }, err => console.error("Error my predictions sync:", err));
+
+        const myProfileRef = db.collection('artifacts').doc(appId).collection('public').doc('data').collection('users').doc(userId);
+        const unsubMyProfile = myProfileRef.onSnapshot((docSnap) => {
+          if (docSnap.exists) {
+            setMyProfile(docSnap.data());
+          } else {
+            const defaultProfile = { username: '', registered: false };
+            myProfileRef.set(defaultProfile);
+            setMyProfile(defaultProfile);
+          }
+        }, err => console.error("Error profile sync:", err));
+
+        const allPredsRef = db.collection('artifacts').doc(appId).collection('public').doc('data').collection('predictions');
+        const unsubAllPreds = allPredsRef.onSnapshot((qs) => {
+          const predsMap = {};
+          qs.forEach(doc => {
+            predsMap[doc.id] = doc.data();
+          });
+          setAllPredictions(predsMap);
+        }, err => console.error("Error all predictions sync:", err));
+
+        const allUsersRef = db.collection('artifacts').doc(appId).collection('public').doc('data').collection('users');
+        const unsubAllUsers = allUsersRef.onSnapshot((qs) => {
+          const usersMap = {};
+          qs.forEach(doc => {
+            usersMap[doc.id] = doc.data();
+          });
+          setAllUsers(usersMap);
+        }, err => console.error("Error all users sync:", err));
+
+        return () => {
+          unsubResults();
+          unsubMyPreds();
+          unsubMyProfile();
+          unsubAllPreds();
+          unsubAllUsers();
+        };
+      }, [userId]);
+
+      // --- PERSISTENCE ---
+      const saveMyPredictions = async (updated) => {
+        // Double security guard against client edits after submission
+        if (myPredictions.submitted) {
+          console.warn("Attempted to modify locked predictions!");
+          return;
+        }
+
+        setMyPredictions(updated);
+        setSaveStatus('Сохранение...');
+        if (!firebaseEnabled) {
+          localStorage.setItem(`wc_preds_${userId}`, JSON.stringify(updated));
+          setAllPredictions(prev => ({ ...prev, [userId]: updated }));
+          setTimeout(() => setSaveStatus('Сохранено локально ✓'), 300);
+          return;
+        }
+
+        try {
+          const myPredRef = db.collection('artifacts').doc(appId).collection('public').doc('data').collection('predictions').doc(userId);
+          await myPredRef.set(updated);
+          setSaveStatus('Прогнозы сохранены в облаке! ✓');
+          setTimeout(() => setSaveStatus(''), 2500);
+        } catch (err) {
+          console.error("Save predictions failed:", err);
+          setSaveStatus('Ошибка сохранения');
+        }
+      };
+
+      const saveMyProfile = async (updatedProf) => {
+        setMyProfile(updatedProf);
+        if (!firebaseEnabled) {
+          localStorage.setItem(`wc_profile_${userId}`, JSON.stringify(updatedProf));
+          setAllUsers(prev => ({ ...prev, [userId]: updatedProf }));
+          return;
+        }
+
+        try {
+          const myProfileRef = db.collection('artifacts').doc(appId).collection('public').doc('data').collection('users').doc(userId);
+          await myProfileRef.set(updatedProf, { merge: true });
+        } catch (err) {
+          console.error("Save profile failed:", err);
+        }
+      };
+
+      const saveRealResults = async (updatedResults) => {
+        setRealResults(updatedResults);
+        if (!firebaseEnabled) {
+          localStorage.setItem('wc_results_global', JSON.stringify(updatedResults));
+          return;
+        }
+
+        try {
+          const resultsRef = db.collection('artifacts').doc(appId).collection('public').doc('results').collection('data').doc('global');
+          await resultsRef.set(updatedResults);
+        } catch (err) {
+          console.error("Save real results failed:", err);
+        }
+      };
+
+      // --- SUBMIT LOCK LOGIC ---
+      const handleSubmitLock = () => {
+        setSubmitWarningWarningMsg('Вы уверены, что хотите зафиксировать прогнозы? После подтверждения изменить счета или продвинуть другие команды будет НЕВОЗМОЖНО.');
+        setShowSubmitConfirm(true);
+      };
+
+      const confirmSubmitLock = () => {
+        const updated = { ...myPredictions, submitted: true };
+        setMyPredictions(updated);
+        setShowSubmitConfirm(false);
+
+        if (!firebaseEnabled) {
+          localStorage.setItem(`wc_preds_${userId}`, JSON.stringify(updated));
+          setAllPredictions(prev => ({ ...prev, [userId]: updated }));
+          setSaveStatus('Прогнозы успешно заблокированы! 🔒');
+          return;
+        }
+
+        db.collection('artifacts').doc(appId).collection('public').doc('data').collection('predictions').doc(userId)
+          .set(updated)
+          .then(() => {
+            setSaveStatus('Прогнозы зафиксированы и защищены! 🔒');
+            setTimeout(() => setSaveStatus(''), 4000);
+          })
+          .catch(err => console.error("Error locks:", err));
+      };
+
+      // --- ADMIN TOGGLE & PASSWORD LOCK ---
+      const handleAdminToggle = () => {
+        if (isAdminMode) {
+          setIsAdminMode(false);
+          if (activeTab === 'admin') {
+            setActiveTab('predictions');
+          }
+        } else {
+          setAdminPasswordInput('');
+          setAdminPasswordError('');
+          setShowAdminPasswordModal(true);
+        }
+      };
+
+      const handleAdminPasswordSubmit = () => {
+        if (adminPasswordInput === '11062026') {
+          setIsAdminMode(true);
+          setShowAdminPasswordModal(false);
+        } else {
+          setAdminPasswordError('Неверный пароль администратора!');
+        }
+      };
+
+      // --- RANDOM AUTO-FILL ENGINE ---
+      const handleAutoFill = () => {
+        if (myPredictions.submitted) return;
+        const updatedMatches = { ...myPredictions.matches };
+        STATIC_MATCHES.forEach(m => {
+          const home = Math.floor(Math.random() * 3) + (Math.random() > 0.75 ? Math.floor(Math.random() * 2) : 0);
+          const away = Math.floor(Math.random() * 3) + (Math.random() > 0.75 ? Math.floor(Math.random() * 2) : 0);
+          updatedMatches[m.id] = { home: String(home), away: String(away) };
+        });
+        const updated = { ...myPredictions, matches: updatedMatches };
+        saveMyPredictions(updated);
+      };
+
+      const handleAdminAutoFill = () => {
+        const updatedMatches = { ...realResults.matches };
+        STATIC_MATCHES.forEach(m => {
+          const home = Math.floor(Math.random() * 3);
+          const away = Math.floor(Math.random() * 3);
+          updatedMatches[m.id] = { home: String(home), away: String(away) };
+        });
+        const updated = { ...realResults, matches: updatedMatches };
+        saveRealResults(updated);
+      };
+
+      // --- DERIVED CALCULATIONS ---
+      const myCalculatedStandings = useMemo(() => {
+        return calculateStandings(myPredictions.matches || {});
+      }, [myPredictions.matches]);
+
+      const myCalculatedBracket = useMemo(() => {
+        return resolveWholeBracket(myPredictions.matches || {}, myPredictions.ko || {});
+      }, [myPredictions.matches, myPredictions.ko]);
+
+      // --- REAL/ADMIN STAGE BRACKET RESOLUTION ---
+      const realCalculatedBracket = useMemo(() => {
+        return resolveWholeBracket(realResults.matches || {}, realResults.ko || {});
+      }, [realResults.matches, realResults.ko]);
+
+      const leaderboard = useMemo(() => {
+        const board = Object.keys(allPredictions).map(pId => {
+          const userPred = allPredictions[pId];
+          const prof = allUsers[pId] || { username: `Игрок ${pId.substring(0, 4)}` };
+          const scoreObj = calculateUserScore(userPred, realResults);
+
+          return {
+            userId: pId,
+            username: prof.username || 'Без имени',
+            score: scoreObj.totalPoints,
+            matchPoints: scoreObj.matchPoints,
+            groupPoints: scoreObj.groupTeamsPoints,
+            koPoints: scoreObj.koPoints,
+            breakdown: scoreObj.breakdown
+          };
+        });
+
+        return board.sort((a, b) => {
+          if (b.score !== a.score) return b.score - a.score;
+          if (b.breakdown.score3 !== a.breakdown.score3) return b.breakdown.score3 - a.breakdown.score3;
+          return a.username.localeCompare(b.username);
+        });
+      }, [allPredictions, allUsers, realResults]);
+
+      const myScoreDetails = useMemo(() => {
+        return calculateUserScore(myPredictions, realResults);
+      }, [myPredictions, realResults]);
+
+      // --- ACTIONS ---
+      const handlePredictionChange = (matchId, teamType, val) => {
+        if (myPredictions.submitted) return;
+        const updatedMatches = { ...myPredictions.matches };
+        if (!updatedMatches[matchId]) updatedMatches[matchId] = { home: '', away: '' };
+        updatedMatches[matchId][teamType] = val;
+
+        const updated = { ...myPredictions, matches: updatedMatches };
+        saveMyPredictions(updated);
+      };
+
+      const handleKnockoutAdvance = (matchId, winnerCode) => {
+        if (myPredictions.submitted) return;
+        const updatedKo = { ...myPredictions.ko };
+        updatedKo[matchId] = winnerCode;
+        const updated = { ...myPredictions, ko: updatedKo };
+        saveMyPredictions(updated);
+      };
+
+      const handleRealScoreChange = (matchId, teamType, val) => {
+        const updatedMatches = { ...realResults.matches };
+        if (!updatedMatches[matchId]) updatedMatches[matchId] = { home: '', away: '' };
+        updatedMatches[matchId][teamType] = val;
+
+        const updated = { ...realResults, matches: updatedMatches };
+        saveRealResults(updated);
+      };
+
+      const handleRealKnockoutAdvance = (matchId, winnerCode) => {
+        const updatedKo = { ...realResults.ko };
+        updatedKo[matchId] = winnerCode;
+
+        const updated = { ...realResults, ko: updatedKo };
+        saveRealResults(updated);
+      };
+
+      const handleRegisterUser = () => {
+        if (tempName.trim()) {
+          saveMyProfile({ username: tempName.trim(), registered: true });
+        }
+      };
+
+      const handleCopyLink = () => {
+        const dummy = document.createElement('input');
+        document.body.appendChild(dummy);
+        dummy.value = window.location.href;
+        dummy.select();
+        document.execCommand('copy');
+        document.body.removeChild(dummy);
+        setSaveStatus('Ссылка скопирована в буфер обмена! Отправьте её друзьям. ✓');
+        setTimeout(() => setSaveStatus(''), 4000);
+      };
+
+      // --- HELPERS ---
+      const renderTeamName = (code) => {
+        const t = TEAMS[code];
+        return t ? `${t.flag} ${t.name}` : code;
+      };
+
+      const selectedPlayerDetails = useMemo(() => {
+        if (!selectedPlayerDetailId) return null;
+        const pred = allPredictions[selectedPlayerDetailId] || { matches: {}, ko: {} };
+        const userProf = allUsers[selectedPlayerDetailId] || { username: 'Игрок' };
+        const calcStandings = calculateStandings(pred.matches || {});
+        const calcBracket = resolveWholeBracket(pred.matches || {}, pred.ko || {});
+        const scoreObj = calculateUserScore(pred, realResults);
+
+        return {
+          username: userProf.username,
+          predictions: pred,
+          standings: calcStandings,
+          bracket: calcBracket,
+          scoreObj
+        };
+      }, [selectedPlayerDetailId, allPredictions, allUsers, realResults]);
+
+      // --- IF NOT REGISTERED, FORCE REGISTRATION VIEW ---
+      if (myProfile && !myProfile.registered) {
+        return (
+          <div class="flex items-center justify-center min-h-screen bg-slate-950 text-slate-100 p-4">
+            <div class="bg-slate-900 border-2 border-emerald-500/20 max-w-md w-full p-8 rounded-3xl shadow-2xl space-y-6 text-center">
+              <div class="bg-gradient-to-tr from-emerald-500 to-teal-400 w-16 h-13 p-3 rounded-2xl text-slate-950 mx-auto flex items-center justify-center">
+                <i class="fa-solid fa-user-plus text-3xl"></i>
+              </div>
+              <div class="space-y-2">
+                <h2 class="text-2xl font-extrabold text-slate-100 uppercase tracking-tight">Регистрация прогнозиста</h2>
+                <p class="text-xs text-slate-400 px-4">
+                  Введите свое имя или никнейм. Чтобы игра была честной и никто не путался, <span class="text-emerald-400 font-bold">изменить имя после регистрации будет НЕЛЬЗЯ!</span>
+                </p>
+              </div>
+
+              <div class="space-y-4">
+                <input 
+                  type="text" 
+                  value={tempName}
+                  onChange={(e) => setTempName(e.target.value)}
+                  maxLength="20"
+                  class="w-full bg-slate-950 border border-slate-800 text-slate-100 px-4 py-3 rounded-xl text-center text-sm font-semibold focus:outline-none focus:border-emerald-500 transition-colors"
+                  placeholder="Придумайте имя (напр. Семён77)"
+                />
+
+                <button 
+                  onClick={handleRegisterUser}
+                  disabled={!tempName.trim()}
+                  class="w-full bg-emerald-500 hover:bg-emerald-600 disabled:opacity-40 text-slate-950 font-extrabold py-3.5 rounded-xl text-sm transition-all shadow-md shadow-emerald-500/10"
+                >
+                  Зарегистрироваться и войти
+                </button>
+              </div>
+            </div>
+          </div>
+        );
+      }
+
+      return (
+        <div class="flex flex-col min-h-screen bg-slate-950 text-slate-100 pb-10">
+          
+          {/* HEADER HERO */}
+          <header class="bg-gradient-to-r from-emerald-950 via-slate-900 to-emerald-950 border-b border-emerald-500/30 shadow-lg px-4 py-4 md:py-6 sticky top-0 z-30 backdrop-blur">
+            <div class="max-w-7xl mx-auto flex flex-col md:flex-row md:items-center md:justify-between gap-4">
+              
+              <div class="flex items-center gap-3">
+                <div class="bg-gradient-to-tr from-emerald-500 to-teal-400 p-2 rounded-xl text-slate-950 shadow-md">
+                  <i class="fa-solid fa-trophy text-2xl"></i>
+                </div>
+                <div>
+                  <h1 class="text-xl md:text-2xl font-extrabold tracking-tight bg-gradient-to-r from-emerald-400 via-teal-300 to-yellow-300 bg-clip-text text-transparent">
+                    ПРОГНОЗИСТ ЧМ — 48 СБОРНЫХ
+                  </h1>
+                  <p class="text-xs text-slate-400">Сетка 1/16 финала, выход 32 команд из групп + лучшие 3-и места</p>
+                </div>
+              </div>
+
+              {/* USER PROFILE STATUS */}
+              <div class="flex flex-wrap items-center gap-3 bg-slate-900/80 p-2.5 rounded-2xl border border-slate-700/50 backdrop-blur">
+                <div class="flex items-center gap-2">
+                  <span class="text-xs text-slate-400">Игрок:</span>
+                  <span class="font-bold text-emerald-400">{myProfile?.username}</span>
+                  <span class="text-[9px] bg-slate-850 text-slate-400 px-1.5 py-0.5 rounded border border-slate-800">ID зафиксирован</span>
+                </div>
+
+                <div class="h-4 w-[1px] bg-slate-800 hidden sm:block"></div>
+
+                <div class="flex items-center gap-1.5">
+                  <span class="text-xs text-slate-400">Баллы:</span>
+                  <span class="font-black text-yellow-400 text-lg">{myScoreDetails.totalPoints}</span>
+                </div>
+
+                <button 
+                  onClick={handleCopyLink}
+                  class="bg-emerald-500/10 hover:bg-emerald-500/20 text-emerald-400 border border-emerald-500/20 hover:border-emerald-500/40 px-3 py-1 rounded-xl text-xs font-medium flex items-center gap-1.5 transition"
+                >
+                  <i class="fa-solid fa-share-nodes"></i>
+                  <span>Позвать друзей</span>
+                </button>
+              </div>
+
+            </div>
+          </header>
+
+          {/* MAIN CONTAINER */}
+          <main class="max-w-7xl mx-auto px-4 py-6 flex-grow w-full">
+            
+            {/* TABS NAVIGATION */}
+            <div class="flex flex-wrap gap-2 mb-6 border-b border-slate-800 pb-3">
+              <button 
+                onClick={() => setActiveTab('predictions')}
+                class={`flex items-center gap-2 px-4 py-2.5 rounded-xl font-semibold text-sm transition ${activeTab === 'predictions' ? 'bg-emerald-500 text-slate-950 shadow-md shadow-emerald-500/10' : 'bg-slate-900 text-slate-400 hover:text-slate-200'}`}
+              >
+                <i class="fa-solid fa-square-poll-vertical"></i>
+                <span>Мои Прогнозы</span>
+              </button>
+              <button 
+                onClick={() => setActiveTab('leaderboard')}
+                class={`flex items-center gap-2 px-4 py-2.5 rounded-xl font-semibold text-sm transition ${activeTab === 'leaderboard' ? 'bg-emerald-500 text-slate-950 shadow-md shadow-emerald-500/10' : 'bg-slate-900 text-slate-400 hover:text-slate-200'}`}
+              >
+                <i class="fa-solid fa-ranking-star"></i>
+                <span>Рейтинг Игроков</span>
+              </button>
+              <button 
+                onClick={() => setActiveTab('rules')}
+                class={`flex items-center gap-2 px-4 py-2.5 rounded-xl font-semibold text-sm transition ${activeTab === 'rules' ? 'bg-emerald-500 text-slate-950 shadow-md shadow-emerald-500/10' : 'bg-slate-900 text-slate-400 hover:text-slate-200'}`}
+              >
+                <i class="fa-solid fa-book"></i>
+                <span>Правила начисления</span>
+              </button>
+              
+              <div class="flex-grow"></div>
+              
+              <div class="flex items-center gap-2 bg-slate-900 px-3 py-1.5 rounded-xl border border-slate-800 text-xs">
+                <span class="text-slate-400">Режим Админа:</span>
+                <button 
+                  onClick={handleAdminToggle}
+                  class={`relative w-10 h-6 flex items-center rounded-full transition-colors ${isAdminMode ? 'bg-emerald-500' : 'bg-slate-700'}`}
+                >
+                  <span class={`block w-4 h-4 bg-white rounded-full transition-transform transform ${isAdminMode ? 'translate-x-5' : 'translate-x-1'}`}></span>
+                </button>
+              </div>
+
+              {isAdminMode && (
+                <button 
+                  onClick={() => setActiveTab('admin')}
+                  class={`flex items-center gap-2 px-4 py-2.5 rounded-xl font-semibold text-sm transition ${activeTab === 'admin' ? 'bg-red-500 text-white shadow-md' : 'bg-red-500/20 text-red-300 hover:bg-red-500/30'}`}
+                >
+                  <i class="fa-solid fa-toolbox"></i>
+                  <span>Реальные Результаты</span>
+                </button>
+              )}
+            </div>
+
+            {/* STATUS BAR */}
+            {saveStatus && (
+              <div class="bg-emerald-500/10 border border-emerald-500/30 text-emerald-400 px-4 py-2.5 rounded-xl text-xs font-semibold mb-6 flex items-center justify-between animate-fade-in">
+                <div class="flex items-center gap-2">
+                  <i class="fa-solid fa-circle-check animate-pulse text-emerald-400"></i>
+                  <span>{saveStatus}</span>
+                </div>
+              </div>
+            )}
+
+            {/* LOCK SUBMISSION STATUS BAR ON TAB PREDICTIONS */}
+            {activeTab === 'predictions' && (
+              <div class={`p-4 rounded-2xl border flex flex-col md:flex-row md:items-center md:justify-between gap-4 mb-6 ${myPredictions.submitted ? 'bg-slate-900/50 border-emerald-500/30 text-emerald-400' : 'bg-gradient-to-r from-amber-500/10 to-orange-500/10 border-amber-500/20 text-amber-300'}`}>
+                <div class="flex items-center gap-3">
+                  <div class={`p-2.5 rounded-xl ${myPredictions.submitted ? 'bg-emerald-500/10 text-emerald-400' : 'bg-amber-500/10 text-amber-300'}`}>
+                    <i class={`fa-solid ${myPredictions.submitted ? 'fa-lock' : 'fa-lock-open-alt'} text-xl`}></i>
+                  </div>
+                  <div>
+                    <h4 class="font-extrabold text-sm">{myPredictions.submitted ? 'ПРОГНОЗЫ ЗАФИКСИРОВАНЫ' : 'ПРОГНОЗЫ ОТКРЫТЫ ДЛЯ РЕДАКТИРОВАНИЯ'}</h4>
+                    <p class="text-xs text-slate-400 mt-0.5">
+                      {myPredictions.submitted 
+                        ? 'Ваши прогнозы отправлены организатору и защищены от изменений задним числом. Удачи в соревновании!' 
+                        : 'Вносите счета групповых матчей и продвигайте фаворитов по плей-офф. После заполнения зафиксируйте результат.'}
+                    </p>
+                  </div>
+                </div>
+
+                {!myPredictions.submitted && (
+                  <button 
+                    onClick={handleSubmitLock}
+                    class="bg-amber-500 hover:bg-amber-600 text-slate-950 font-black px-6 py-2.5 rounded-xl text-xs flex items-center gap-2 transition shadow-lg shadow-amber-500/5"
+                  >
+                    <i class="fa-solid fa-circle-check"></i>
+                    <span>Отправить и зафиксировать прогнозирование</span>
+                  </button>
+                )}
+              </div>
+            )}
+
+            {/* TAB CONTENT: PREDICTIONS */}
+            {activeTab === 'predictions' && (
+              <div class="space-y-6">
+                
+                {/* SUB TAB SELECTOR */}
+                <div class="flex flex-col sm:flex-row items-center justify-between gap-4 bg-slate-900 p-2.5 rounded-2xl border border-slate-800">
+                  <div class="flex flex-wrap gap-1">
+                    {['A', 'B', 'C', 'D', 'E', 'F', 'G', 'H', 'I', 'J', 'K', 'L'].map(g => (
+                      <button
+                        key={g}
+                        disabled={activeTab !== 'predictions'}
+                        onClick={() => setPredGroupTab(g)}
+                        class={`w-8 h-8 rounded-lg text-xs font-bold transition-all ${predGroupTab === g ? 'bg-emerald-500 text-slate-950 shadow-md font-black' : 'text-slate-400 hover:text-slate-200 hover:bg-slate-800'}`}
+                      >
+                        {g}
+                      </button>
+                    ))}
+                    <div class="w-[1px] h-8 bg-slate-800 mx-1"></div>
+                    <button
+                      onClick={() => setPredGroupTab('third')}
+                      class={`px-3 py-1.5 rounded-lg text-xs font-bold transition-all ${predGroupTab === 'third' ? 'bg-slate-800 text-emerald-400 shadow-inner' : 'text-slate-400 hover:text-slate-200'}`}
+                    >
+                      3-и места
+                    </button>
+                    <button
+                      onClick={() => setPredGroupTab('ko')}
+                      class={`px-3 py-1.5 rounded-lg text-xs font-bold transition-all bg-gradient-to-r from-emerald-500/10 to-teal-500/10 ${predGroupTab === 'ko' ? 'bg-gradient-to-r from-emerald-500 to-teal-500 text-slate-950' : 'text-slate-300 hover:text-white'}`}
+                    >
+                      Сетка плей-офф
+                    </button>
+                  </div>
+
+                  {!myPredictions.submitted && (
+                    <button 
+                      onClick={handleAutoFill}
+                      class="bg-slate-800 hover:bg-slate-700 text-emerald-400 border border-slate-750 hover:border-emerald-500/30 px-3.5 py-1.5 rounded-xl text-xs font-semibold flex items-center gap-1.5 transition ml-auto"
+                      title="Заполнить случайными результатами все 12 групп"
+                    >
+                      <i class="fa-solid fa-bolt animate-bounce"></i>
+                      <span>⚡ Автозаполнение прогнозов</span>
+                    </button>
+                  )}
+                </div>
+
+                {/* GROUP VIEWS (A-L) */}
+                {['A', 'B', 'C', 'D', 'E', 'F', 'G', 'H', 'I', 'J', 'K', 'L'].includes(predGroupTab) && (
+                  <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
+                    
+                    {/* MATCHES LIST CARD */}
+                    <div class="bg-slate-900 p-5 rounded-2xl border border-slate-800 shadow-sm space-y-4">
+                      <div class="flex items-center justify-between border-b border-slate-800 pb-3">
+                        <h3 class="font-bold text-lg text-emerald-400">Групповые прогнозы — Группа {predGroupTab}</h3>
+                        <span class="text-xs text-slate-400">{myPredictions.submitted ? '🔒 Только для чтения' : 'Введите счета'}</span>
+                      </div>
+                      
+                      <div class="space-y-4">
+                        {STATIC_MATCHES.filter(m => m.group === predGroupTab).map(match => {
+                          const pred = myPredictions.matches?.[match.id] || { home: '', away: '' };
+                          const real = realResults.matches?.[match.id];
+                          const hasReal = real && real.home !== undefined && real.away !== undefined && real.home !== '' && real.away !== '';
+
+                          return (
+                            <div key={match.id} class="flex flex-col p-3 bg-slate-950 rounded-xl border border-slate-850 hover:border-slate-800 transition-all gap-2 text-xs">
+                              
+                              {/* Match Time & City Info Header */}
+                              <div class="text-[10px] text-slate-400 font-medium flex items-center justify-center gap-1 bg-slate-900/60 px-2 py-0.5 rounded-full border border-slate-850">
+                                <i class="fa-regular fa-calendar-days text-emerald-400 text-[9px]"></i>
+                                <span>{match.date} &bull; {match.time} &bull; {match.city}</span>
+                              </div>
+
+                              {/* Teams with inputs */}
+                              <div class="flex items-center justify-between w-full mt-1">
+                                <div class="flex items-center gap-2 w-2/5 justify-end text-right">
+                                  <span class="font-semibold truncate">{TEAMS[match.home].name}</span>
+                                  <span class="text-xl shrink-0">{TEAMS[match.home].flag}</span>
+                                </div>
+
+                                <div class="flex items-center gap-1.5">
+                                  <input
+                                    type="number"
+                                    min="0"
+                                    placeholder="-"
+                                    disabled={myPredictions.submitted}
+                                    value={pred.home}
+                                    onChange={(e) => handlePredictionChange(match.id, 'home', e.target.value)}
+                                    class="w-10 h-8 bg-slate-900 text-center font-extrabold text-base border border-slate-800 focus:border-emerald-500 rounded focus:outline-none disabled:opacity-60 disabled:cursor-not-allowed"
+                                  />
+                                  <span class="text-slate-600 font-bold">:</span>
+                                  <input
+                                    type="number"
+                                    min="0"
+                                    placeholder="-"
+                                    disabled={myPredictions.submitted}
+                                    value={pred.away}
+                                    onChange={(e) => handlePredictionChange(match.id, 'away', e.target.value)}
+                                    class="w-10 h-8 bg-slate-900 text-center font-extrabold text-base border border-slate-800 focus:border-emerald-500 rounded focus:outline-none disabled:opacity-60 disabled:cursor-not-allowed"
+                                  />
+                                </div>
+
+                                <div class="flex items-center gap-2 w-2/5 justify-start text-left">
+                                  <span class="text-xl shrink-0">{TEAMS[match.away].flag}</span>
+                                  <span class="font-semibold truncate">{TEAMS[match.away].name}</span>
+                                </div>
+                              </div>
+
+                              {hasReal && (
+                                <div class="text-center text-[10px] bg-emerald-500/10 text-emerald-400 py-0.5 rounded border border-emerald-500/20 w-full">
+                                  Результат матча: <span class="font-bold">{real.home} : {real.away}</span>
+                                </div>
+                              )}
+                            </div>
+                          );
+                        })}
+                      </div>
+                    </div>
+
+                    {/* DYNAMIC STANDINGS CARD */}
+                    <div class="bg-slate-900 p-5 rounded-2xl border border-slate-800 shadow-sm space-y-4">
+                      <div class="flex items-center justify-between border-b border-slate-800 pb-3">
+                        <h3 class="font-bold text-lg text-emerald-400">Прогноз Таблицы — Группа {predGroupTab}</h3>
+                        <span class="text-xs text-emerald-400">Выход команд</span>
+                      </div>
+
+                      <div class="overflow-x-auto">
+                        <table class="w-full text-left text-[11px] border-collapse">
+                          <thead>
+                            <tr class="text-slate-400 border-b border-slate-800">
+                              <th class="py-2 font-semibold">#</th>
+                              <th class="py-2 font-semibold">Сборная</th>
+                              <th class="py-2 font-semibold text-center">И</th>
+                              <th class="py-2 font-semibold text-center">В</th>
+                              <th class="py-2 font-semibold text-center">Н</th>
+                              <th class="py-2 font-semibold text-center">П</th>
+                              <th class="py-2 font-semibold text-center">Мячи</th>
+                              <th class="py-2 font-semibold text-center">+/-</th>
+                              <th class="py-2 font-semibold text-right text-emerald-400">Очки</th>
+                            </tr>
+                          </thead>
+                          <tbody class="divide-y divide-slate-800/50">
+                            {myCalculatedStandings.standings[predGroupTab].map((team, idx) => {
+                              const isQual = idx < 2;
+                              return (
+                                <tr key={team.code} class={`hover:bg-slate-800/20 transition-colors ${isQual ? 'bg-emerald-500/5' : ''}`}>
+                                  <td class="py-2.5 font-extrabold pr-2">
+                                    <span class={`inline-flex items-center justify-center w-5 h-5 rounded text-[10px] ${isQual ? 'bg-emerald-500/20 text-emerald-400' : 'bg-slate-800 text-slate-500'}`}>
+                                      {idx + 1}
+                                    </span>
+                                  </td>
+                                  <td class="py-2.5 font-semibold text-slate-200">
+                                    <span class="text-base mr-1.5">{team.flag}</span>
+                                    {team.name}
+                                  </td>
+                                  <td class="py-2.5 text-center text-slate-300">{team.played}</td>
+                                  <td class="py-2.5 text-center text-slate-300">{team.win}</td>
+                                  <td class="py-2.5 text-center text-slate-300">{team.draw}</td>
+                                  <td class="py-2.5 text-center text-slate-300">{team.loss}</td>
+                                  <td class="py-2.5 text-center text-slate-400">{team.gf}:{team.ga}</td>
+                                  <td class="py-2.5 text-center font-medium text-slate-300">{team.gd > 0 ? `+${team.gd}` : team.gd}</td>
+                                  <td class="py-2.5 text-right font-bold text-emerald-400 text-xs">{team.pts}</td>
+                                </tr>
+                              );
+                            })}
+                          </tbody>
+                        </table>
+                      </div>
+                    </div>
+
+                  </div>
+                )}
+
+                {/* THIRD PLACES TAB */}
+                {predGroupTab === 'third' && (
+                  <div class="bg-slate-900 p-5 rounded-2xl border border-slate-800 shadow-sm space-y-4">
+                    <div class="flex items-center justify-between border-b border-slate-800 pb-3">
+                      <div>
+                        <h3 class="font-bold text-lg text-emerald-400">Сравнение третьих мест (Прогноз)</h3>
+                        <p class="text-xs text-slate-400">Рейтинг команд, занявших 3-е место в своих группах</p>
+                      </div>
+                      <span class="bg-emerald-500/10 text-emerald-400 text-xs px-2.5 py-1 rounded-full font-bold">
+                        8 лучших выходят в 1/16 финала
+                      </span>
+                    </div>
+
+                    <div class="overflow-x-auto">
+                      <table class="w-full text-left text-xs border-collapse">
+                        <thead>
+                          <tr class="text-slate-400 border-b border-slate-800">
+                            <th class="py-2.5 font-semibold">#</th>
+                            <th class="py-2.5 font-semibold">Гр.</th>
+                            <th class="py-2.5 font-semibold">Сборная</th>
+                            <th class="py-2.5 font-semibold text-center">И</th>
+                            <th class="py-2.5 font-semibold text-center">В</th>
+                            <th class="py-2.5 font-semibold text-center">Н</th>
+                            <th class="py-2.5 font-semibold text-center">П</th>
+                            <th class="py-2.5 font-semibold text-center">Мячи</th>
+                            <th class="py-2.5 font-semibold text-center">Разн.</th>
+                            <th class="py-2.5 font-semibold text-right text-emerald-400">Очки</th>
+                          </tr>
+                        </thead>
+                        <tbody class="divide-y divide-slate-800/50">
+                          {myCalculatedStandings.thirdPlaced.map((team, idx) => {
+                            const isPass = idx < 8;
+                            return (
+                              <tr key={team.code} class={`hover:bg-slate-800/20 transition-colors ${isPass ? 'bg-emerald-500/5' : 'bg-red-500/5'}`}>
+                                <td class="py-3 font-extrabold pr-2">
+                                  <span class={`inline-flex items-center justify-center w-5 h-5 rounded ${isPass ? 'bg-emerald-500/20 text-emerald-400' : 'bg-red-500/20 text-red-400'}`}>
+                                    {idx + 1}
+                                  </span>
+                                </td>
+                                <td class="py-3 font-bold text-slate-400">{team.group}</td>
+                                <td class="py-3 font-semibold text-slate-200">
+                                  <span class="text-lg mr-1.5">{team.flag}</span>
+                                  {team.name}
+                                </td>
+                                <td class="py-3 text-center text-slate-300">{team.played}</td>
+                                <td class="py-3 text-center text-slate-300">{team.win}</td>
+                                <td class="py-3 text-center text-slate-300">{team.draw}</td>
+                                <td class="py-3 text-center text-slate-300">{team.loss}</td>
+                                <td class="py-3 text-center text-slate-400">{team.gf}:{team.ga}</td>
+                                <td class="py-3 text-center font-medium text-slate-300">{team.gd > 0 ? `+${team.gd}` : team.gd}</td>
+                                <td class="py-3 text-right font-bold text-emerald-400 text-sm">{team.pts}</td>
+                              </tr>
+                            );
+                          })}
+                        </tbody>
+                      </table>
+                    </div>
+                  </div>
+                )}
+
+                {/* KNOCKOUTS INTERACTIVE BRACKET */}
+                {predGroupTab === 'ko' && (
+                  <div class="space-y-6">
+                    
+                    <div class="flex flex-wrap gap-1 bg-slate-900 p-1.5 rounded-xl border border-slate-800">
+                      {[
+                        { key: 'R32', label: '1/16 Финала' },
+                        { key: 'R16', label: '1/8 Финала' },
+                        { key: 'QF', label: '1/4 Финала' },
+                        { key: 'SF', label: 'Полуфиналы' },
+                        { key: 'F', label: 'Финал' }
+                      ].map(tab => (
+                        <button 
+                          key={tab.key}
+                          onClick={() => setKoStageTab(tab.key)} 
+                          class={`flex-1 min-w-[100px] py-2 text-center rounded-lg text-xs font-bold transition-all ${koStageTab === tab.key ? 'bg-emerald-500 text-slate-950' : 'text-slate-400 hover:text-slate-200'}`}
+                        >
+                          {tab.label}
+                        </button>
+                      ))}
+                    </div>
+
+                    <div class="p-4 bg-slate-900 border border-slate-800 rounded-2xl font-medium">
+                      <div class="mb-4 text-xs text-slate-400 flex items-center gap-2 italic">
+                        <i class="fa-solid fa-lightbulb text-emerald-400"></i>
+                        <span>Кликните по команде, чтобы продвинуть её вперед. {myPredictions.submitted ? '🔒 Изменения заблокированы' : 'Определите победителя'}</span>
+                      </div>
+
+                      {/* STAGE 1/16 */}
+                      {koStageTab === 'R32' && (
+                        <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+                          {Object.keys(myCalculatedBracket.r32Matches).map((matchId, idx) => {
+                            const [t1, t2] = myCalculatedBracket.r32Matches[matchId];
+                            const selected = myPredictions.ko?.[matchId];
+
+                            return (
+                              <div key={matchId} class="bg-slate-950 p-3 rounded-xl border border-slate-850 space-y-2">
+                                <span class="text-[10px] text-emerald-400 font-extrabold uppercase">Пара #{idx+1} (1/16)</span>
+                                <div class="space-y-1.5">
+                                  <button 
+                                    disabled={t1.code.startsWith('?') || myPredictions.submitted}
+                                    onClick={() => handleKnockoutAdvance(matchId, t1.code)}
+                                    class={`w-full flex items-center justify-between p-2 rounded border text-xs font-semibold transition ${selected === t1.code ? 'bg-emerald-500 text-slate-950 border-emerald-500' : 'bg-slate-900 border-slate-850 text-slate-200 hover:border-slate-700 disabled:opacity-40 disabled:cursor-not-allowed'}`}
+                                  >
+                                    <span class="truncate">{t1.flag} {t1.name}</span>
+                                    {selected === t1.code && <i class="fa-solid fa-circle-check"></i>}
+                                  </button>
+                                  <button 
+                                    disabled={t2.code.startsWith('?') || myPredictions.submitted}
+                                    onClick={() => handleKnockoutAdvance(matchId, t2.code)}
+                                    class={`w-full flex items-center justify-between p-2 rounded border text-xs font-semibold transition ${selected === t2.code ? 'bg-emerald-500 text-slate-950 border-emerald-500' : 'bg-slate-900 border-slate-850 text-slate-200 hover:border-slate-700 disabled:opacity-40 disabled:cursor-not-allowed'}`}
+                                  >
+                                    <span class="truncate">{t2.flag} {t2.name}</span>
+                                    {selected === t2.code && <i class="fa-solid fa-circle-check"></i>}
+                                  </button>
+                                </div>
+                              </div>
+                            );
+                          })}
+                        </div>
+                      )}
+
+                      {/* STAGE 1/8 */}
+                      {koStageTab === 'R16' && (
+                        <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+                          {Object.keys(myCalculatedBracket.r16Matches).map((matchId, idx) => {
+                            const [t1, t2] = myCalculatedBracket.r16Matches[matchId];
+                            const selected = myPredictions.ko?.[matchId];
+
+                            return (
+                              <div key={matchId} class="bg-slate-950 p-3 rounded-xl border border-slate-850 space-y-2">
+                                <span class="text-[10px] text-emerald-400 font-extrabold uppercase">Пара #{idx+1} (1/8)</span>
+                                <div class="space-y-1.5">
+                                  <button 
+                                    disabled={t1.code.startsWith('?') || myPredictions.submitted}
+                                    onClick={() => handleKnockoutAdvance(matchId, t1.code)}
+                                    class={`w-full flex items-center justify-between p-2 rounded border text-xs font-semibold transition ${selected === t1.code ? 'bg-emerald-500 text-slate-950 border-emerald-500' : 'bg-slate-900 border-slate-850 text-slate-200 hover:border-slate-700 disabled:opacity-40'}`}
+                                  >
+                                    <span class="truncate">{t1.flag} {t1.name}</span>
+                                    {selected === t1.code && <i class="fa-solid fa-circle-check"></i>}
+                                  </button>
+                                  <button 
+                                    disabled={t2.code.startsWith('?') || myPredictions.submitted}
+                                    onClick={() => handleKnockoutAdvance(matchId, t2.code)}
+                                    class={`w-full flex items-center justify-between p-2 rounded border text-xs font-semibold transition ${selected === t2.code ? 'bg-emerald-500 text-slate-950 border-emerald-500' : 'bg-slate-900 border-slate-850 text-slate-200 hover:border-slate-700 disabled:opacity-40'}`}
+                                  >
+                                    <span class="truncate">{t2.flag} {t2.name}</span>
+                                    {selected === t2.code && <i class="fa-solid fa-circle-check"></i>}
+                                  </button>
+                                </div>
+                              </div>
+                            );
+                          })}
+                        </div>
+                      )}
+
+                      {/* STAGE 1/4 */}
+                      {koStageTab === 'QF' && (
+                        <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                          {Object.keys(myCalculatedBracket.qfMatches).map((matchId, idx) => {
+                            const [t1, t2] = myCalculatedBracket.qfMatches[matchId];
+                            const selected = myPredictions.ko?.[matchId];
+
+                            return (
+                              <div key={matchId} class="bg-slate-950 p-4 rounded-xl border border-slate-800 space-y-3">
+                                <span class="text-[10px] text-emerald-400 font-extrabold uppercase">Четвертьфинал {idx+1}</span>
+                                <div class="space-y-2">
+                                  <button 
+                                    disabled={!t1 || t1.code.startsWith('?') || myPredictions.submitted}
+                                    onClick={() => handleKnockoutAdvance(matchId, t1.code)}
+                                    class={`w-full flex items-center justify-between p-2.5 rounded-lg border text-sm font-semibold transition ${selected === t1.code ? 'bg-emerald-500 text-slate-950 border-emerald-500' : 'bg-slate-900 border-slate-800 text-slate-200 hover:border-slate-700 disabled:opacity-40'}`}
+                                  >
+                                    <span>{t1 ? `${t1.flag} ${t1.name}` : 'Ждем победителя 1/8'}</span>
+                                    {selected && selected === t1?.code && <i class="fa-solid fa-circle-check"></i>}
+                                  </button>
+                                  <button 
+                                    disabled={!t2 || t2.code.startsWith('?') || myPredictions.submitted}
+                                    onClick={() => handleKnockoutAdvance(matchId, t2.code)}
+                                    class={`w-full flex items-center justify-between p-2.5 rounded-lg border text-sm font-semibold transition ${selected === t2.code ? 'bg-emerald-500 text-slate-950 border-emerald-500' : 'bg-slate-900 border-slate-800 text-slate-200 hover:border-slate-700 disabled:opacity-40'}`}
+                                  >
+                                    <span>{t2 ? `${t2.flag} ${t2.name}` : 'Ждем победителя 1/8'}</span>
+                                    {selected && selected === t2?.code && <i class="fa-solid fa-circle-check"></i>}
+                                  </button>
+                                </div>
+                              </div>
+                            );
+                          })}
+                        </div>
+                      )}
+
+                      {/* STAGE SEMIFINALS */}
+                      {koStageTab === 'SF' && (
+                        <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                          {Object.keys(myCalculatedBracket.sfMatches).map((matchId, idx) => {
+                            const [t1, t2] = myCalculatedBracket.sfMatches[matchId];
+                            const selected = myPredictions.ko?.[matchId];
+
+                            return (
+                              <div key={matchId} class="bg-slate-950 p-4 rounded-xl border border-slate-800 space-y-3">
+                                <span class="text-[10px] text-emerald-400 font-extrabold uppercase">Полуфинал {idx+1}</span>
+                                <div class="space-y-2">
+                                  <button 
+                                    disabled={!t1 || t1.code.startsWith('?') || myPredictions.submitted}
+                                    onClick={() => handleKnockoutAdvance(matchId, t1.code)}
+                                    class={`w-full flex items-center justify-between p-2.5 rounded-lg border text-sm font-semibold transition ${selected === t1.code ? 'bg-emerald-500 text-slate-950 border-emerald-500' : 'bg-slate-900 border-slate-800 text-slate-200 hover:border-slate-700 disabled:opacity-40'}`}
+                                  >
+                                    <span>{t1 ? `${t1.flag} ${t1.name}` : 'Ждем победителя 1/4'}</span>
+                                    {selected && selected === t1?.code && <i class="fa-solid fa-circle-check"></i>}
+                                  </button>
+                                  <button 
+                                    disabled={!t2 || t2.code.startsWith('?') || myPredictions.submitted}
+                                    onClick={() => handleKnockoutAdvance(matchId, t2.code)}
+                                    class={`w-full flex items-center justify-between p-2.5 rounded-lg border text-sm font-semibold transition ${selected === t2.code ? 'bg-emerald-500 text-slate-950 border-emerald-500' : 'bg-slate-900 border-slate-800 text-slate-200 hover:border-slate-700 disabled:opacity-40'}`}
+                                  >
+                                    <span>{t2 ? `${t2.flag} ${t2.name}` : 'Ждем победителя 1/4'}</span>
+                                    {selected && selected === t2?.code && <i class="fa-solid fa-circle-check"></i>}
+                                  </button>
+                                </div>
+                              </div>
+                            );
+                          })}
+                        </div>
+                      )}
+
+                      {/* FINAL */}
+                      {koStageTab === 'F' && (
+                        <div class="max-w-md mx-auto space-y-4">
+                          <div class="bg-gradient-to-tr from-slate-950 to-emerald-950 p-6 rounded-2xl border border-emerald-500/20 shadow-xl space-y-4">
+                            <div class="text-center">
+                              <span class="text-xs text-yellow-400 font-extrabold uppercase tracking-widest block mb-1">ФИНАЛ ЧЕМПИОНАТА МИРА</span>
+                            </div>
+
+                            {Object.keys(myCalculatedBracket.finalMatches).map((matchId) => {
+                              const [t1, t2] = myCalculatedBracket.finalMatches[matchId];
+                              const selected = myPredictions.ko?.[matchId];
+
+                              return (
+                                <div key={matchId} class="space-y-3">
+                                  <button 
+                                    disabled={!t1 || t1.code.startsWith('?') || myPredictions.submitted}
+                                    onClick={() => handleKnockoutAdvance(matchId, t1.code)}
+                                    class={`w-full flex items-center justify-between p-3.5 rounded-xl border text-sm font-semibold transition ${selected === t1.code ? 'bg-yellow-400 text-slate-950 border-yellow-400 shadow-md font-bold' : 'bg-slate-900 border-slate-800 text-slate-200 hover:border-slate-700 disabled:opacity-40'}`}
+                                  >
+                                    <span>{t1 ? `${t1.flag} ${t1.name}` : 'Ждем полуфиналиста #1'}</span>
+                                    {selected && selected === t1?.code && <i class="fa-solid fa-crown text-base"></i>}
+                                  </button>
+                                  <div class="text-center font-bold text-slate-500 text-sm">VS</div>
+                                  <button 
+                                    disabled={!t2 || t2.code.startsWith('?') || myPredictions.submitted}
+                                    onClick={() => handleKnockoutAdvance(matchId, t2.code)}
+                                    class={`w-full flex items-center justify-between p-3.5 rounded-xl border text-sm font-semibold transition ${selected === t2.code ? 'bg-yellow-400 text-slate-950 border-yellow-400 shadow-md font-bold' : 'bg-slate-900 border-slate-800 text-slate-200 hover:border-slate-700 disabled:opacity-40'}`}
+                                  >
+                                    <span>{t2 ? `${t2.flag} ${t2.name}` : 'Ждем полуфиналиста #2'}</span>
+                                    {selected && selected === t2?.code && <i class="fa-solid fa-crown text-base"></i>}
+                                  </button>
+                                </div>
+                              );
+                            })}
+                          </div>
+
+                          {/* CHAMPION BOX */}
+                          {myCalculatedBracket.champion && (
+                            <div class="bg-gradient-to-tr from-yellow-500/10 to-amber-500/10 border border-yellow-500/30 p-5 rounded-2xl text-center shadow-lg space-y-2 animate-pulse">
+                              <span class="text-xs text-yellow-400 font-extrabold uppercase tracking-widest block">Ваш Победитель турнира</span>
+                              <div class="text-2xl font-black text-amber-300">
+                                {TEAMS[myCalculatedBracket.champion]?.flag} {TEAMS[myCalculatedBracket.champion]?.name}
+                              </div>
+                            </div>
+                          )}
+                        </div>
+                      )}
+
+                    </div>
+                  </div>
+                )}
+
+              </div>
+            )}
+
+            {/* TAB CONTENT: LEADERBOARD */}
+            {activeTab === 'leaderboard' && (
+              <div class="space-y-6">
+                
+                {/* TOP 3 PODIUM */}
+                <div class="grid grid-cols-1 md:grid-cols-3 gap-4 items-end pt-4 max-w-4xl mx-auto animate-fade-in">
+                  
+                  {/* 2nd place */}
+                  {leaderboard[1] && (
+                    <div class="bg-slate-900/60 p-5 rounded-2xl border border-slate-800 text-center space-y-2 order-2 md:order-1 h-36 flex flex-col justify-end">
+                      <div class="text-slate-400"><i class="fa-solid fa-medal text-2xl text-slate-400"></i></div>
+                      <h4 class="font-bold text-sm text-slate-200 truncate">{leaderboard[1].username}</h4>
+                      <div class="text-xl font-black text-slate-300">{leaderboard[1].score} <span class="text-xs font-normal text-slate-400">очков</span></div>
+                    </div>
+                  )}
+
+                  {/* 1st place */}
+                  {leaderboard[0] && (
+                    <div class="bg-gradient-to-t from-emerald-950/40 to-yellow-950/20 p-6 rounded-3xl border border-yellow-500/30 text-center space-y-3 order-1 md:order-2 h-44 flex flex-col justify-end shadow-xl shadow-yellow-500/5">
+                      <div><i class="fa-solid fa-crown text-4xl text-yellow-400 animate-bounce"></i></div>
+                      <h4 class="font-extrabold text-base text-yellow-300 truncate">{leaderboard[0].username}</h4>
+                      <div class="text-2xl font-black text-yellow-400">{leaderboard[0].score} <span class="text-xs font-normal text-slate-300">очков</span></div>
+                    </div>
+                  )}
+
+                  {/* 3rd place */}
+                  {leaderboard[2] && (
+                    <div class="bg-slate-900/60 p-5 rounded-2xl border border-slate-800 text-center space-y-2 order-3 h-32 flex flex-col justify-end">
+                      <div class="text-amber-700"><i class="fa-solid fa-medal text-2xl text-amber-700"></i></div>
+                      <h4 class="font-bold text-sm text-slate-200 truncate">{leaderboard[2].username}</h4>
+                      <div class="text-lg font-black text-amber-600">{leaderboard[2].score} <span class="text-xs font-normal text-slate-400">очков</span></div>
+                    </div>
+                  )}
+
+                </div>
+
+                {/* BOARD TABLE */}
+                <div class="bg-slate-900 p-5 rounded-2xl border border-slate-800 shadow-sm">
+                  <h3 class="font-bold text-lg text-emerald-400 mb-4 border-b border-slate-800 pb-3">Таблица рейтингов игроков</h3>
+                  
+                  <div class="overflow-x-auto">
+                    <table class="w-full text-left text-xs border-collapse">
+                      <thead>
+                        <tr class="text-slate-400 border-b border-slate-800">
+                          <th class="py-3 font-semibold text-center w-12">Место</th>
+                          <th class="py-3 font-semibold">Игрок</th>
+                          <th class="py-3 font-semibold text-center">Статус</th>
+                          <th class="py-3 font-semibold text-center">Точный счет (3б)</th>
+                          <th class="py-3 font-semibold text-center">Разница (2б)</th>
+                          <th class="py-3 font-semibold text-center">Исход (1б)</th>
+                          <th class="py-3 font-semibold text-center">Выход в 1/16 (5б)</th>
+                          <th class="py-3 font-semibold text-center">Плей-офф баллы</th>
+                          <th class="py-3 font-bold text-right text-emerald-400 text-sm">Итого очков</th>
+                          <th class="py-3 text-center w-10">Прогноз</th>
+                        </tr>
+                      </thead>
+                      <tbody class="divide-y divide-slate-800/40">
+                        {leaderboard.map((player, idx) => {
+                          const isSelf = player.userId === userId;
+                          const pPred = allPredictions[player.userId] || {};
+                          return (
+                            <tr key={player.userId} class={`hover:bg-slate-800/30 transition-colors ${isSelf ? 'bg-emerald-500/5' : ''}`}>
+                              <td class="py-3.5 text-center font-extrabold text-slate-400">
+                                {idx + 1}
+                              </td>
+                              <td class="py-3.5 font-bold text-slate-200">
+                                {player.username} {isSelf && <span class="text-[10px] bg-emerald-500 text-slate-950 px-1.5 py-0.5 rounded font-extrabold ml-1.5">ВЫ</span>}
+                              </td>
+                              <td class="py-3.5 text-center">
+                                <span class={`inline-block px-2 py-0.5 rounded text-[10px] font-bold ${pPred.submitted ? 'bg-emerald-500/10 text-emerald-400' : 'bg-amber-500/10 text-amber-300'}`}>
+                                  {pPred.submitted ? '🔒 Сдан' : '✍ Заполняет'}
+                                </span>
+                              </td>
+                              <td class="py-3.5 text-center text-slate-300 font-semibold">{player.breakdown.score3}</td>
+                              <td class="py-3.5 text-center text-slate-300 font-semibold">{player.breakdown.score2}</td>
+                              <td class="py-3.5 text-center text-slate-300 font-semibold">{player.breakdown.score1}</td>
+                              <td class="py-3.5 text-center text-slate-300 font-semibold">{player.breakdown.correctAdvancingCount} <span class="text-slate-500 text-[10px]">({player.groupPoints}б)</span></td>
+                              <td class="py-3.5 text-center text-emerald-400 font-bold">{player.koPoints}б</td>
+                              <td class="py-3.5 text-right font-black text-emerald-400 text-sm">{player.score}</td>
+                              <td class="py-3.5 text-center">
+                                <button 
+                                  onClick={() => setSelectedPlayerDetailId(player.userId)}
+                                  class="text-slate-400 hover:text-emerald-400 p-1.5 rounded bg-slate-800/50 hover:bg-slate-800 transition"
+                                  title="Посмотреть прогноз игрока"
+                                >
+                                  <i class="fa-solid fa-eye"></i>
+                                </button>
+                              </td>
+                            </tr>
+                          );
+                        })}
+                      </tbody>
+                    </table>
+                  </div>
+                </div>
+
+              </div>
+            )}
+
+            {/* TAB CONTENT: RULES */}
+            {activeTab === 'rules' && (
+              <div class="grid grid-cols-1 md:grid-cols-2 gap-6 animate-fade-in">
+                
+                {/* SCORE CARD */}
+                <div class="bg-slate-900 p-6 rounded-2xl border border-slate-800 space-y-4">
+                  <h3 class="font-extrabold text-lg text-emerald-400 border-b border-slate-800 pb-3 flex items-center gap-2">
+                    <i class="fa-solid fa-futbol text-emerald-500"></i>
+                    Начисление за прогнозы матчей
+                  </h3>
+                  
+                  <div class="space-y-4">
+                    <div class="flex items-start gap-3 bg-slate-950 p-3 rounded-xl border border-slate-800">
+                      <div class="bg-emerald-500 text-slate-950 font-bold w-7 h-7 rounded-lg flex items-center justify-center shrink-0">3</div>
+                      <div>
+                        <h4 class="font-bold text-sm text-slate-200">Точный счет матча</h4>
+                        <p class="text-xs text-slate-400">Например, прогноз 2:1 и реальный счет матча 2:1</p>
+                      </div>
+                    </div>
+
+                    <div class="flex items-start gap-3 bg-slate-950 p-3 rounded-xl border border-slate-800">
+                      <div class="bg-emerald-500 text-slate-950 font-bold w-7 h-7 rounded-lg flex items-center justify-center shrink-0">2</div>
+                      <div>
+                        <h4 class="font-bold text-sm text-slate-200">Победитель + Разница мячей</h4>
+                        <p class="text-xs text-slate-400">Например, прогноз 2:0, реальный счет 3:1 (или ничья: прогноз 1:1, реальный счет 2:2)</p>
+                      </div>
+                    </div>
+
+                    <div class="flex items-start gap-3 bg-slate-950 p-3 rounded-xl border border-slate-800">
+                      <div class="bg-emerald-500 text-slate-950 font-bold w-7 h-7 rounded-lg flex items-center justify-center shrink-0">1</div>
+                      <div>
+                        <h4 class="font-bold text-sm text-slate-200">Просто победитель (исход)</h4>
+                        <p class="text-xs text-slate-400">Например, прогноз 2:0, реальный счет 1:0 (победа угадана, но разница не та)</p>
+                      </div>
+                    </div>
+                  </div>
+                  <div class="text-[11px] text-slate-400 italic">
+                    * Баллы рассчитываются только при совпадении результатов и вносятся исключительно после ввода организатором официальных фактов.
+                  </div>
+                </div>
+
+                {/* TOURNAMENT RULES CARD */}
+                <div class="bg-slate-900 p-6 rounded-2xl border border-slate-800 space-y-4">
+                  <h3 class="font-extrabold text-lg text-yellow-400 border-b border-slate-800 pb-3 flex items-center gap-2">
+                    <i class="fa-solid fa-diagram-project text-yellow-500"></i>
+                    Начисление за команды и сетку
+                  </h3>
+
+                  <div class="space-y-4 text-xs">
+                    <div class="bg-slate-950 p-3.5 rounded-xl border border-slate-800 space-y-1">
+                      <div class="flex items-center justify-between font-bold text-slate-200">
+                        <span>Выход из группы (в 1/16 финала)</span>
+                        <span class="text-yellow-400">+5 баллов / команда</span>
+                      </div>
+                      <p class="text-slate-400">За каждую угаданную команду, которая по факту выходит из группы в 1/16 финала (включая 8 лучших третьих мест).</p>
+                    </div>
+
+                    <div class="bg-slate-950 p-3.5 rounded-xl border border-slate-800 space-y-2">
+                      <h4 class="font-bold text-slate-200">Стадии плей-офф (накопительные баллы):</h4>
+                      <p class="text-slate-400 text-[11px] mb-2">Вы получаете баллы за продвижение команд в вашей сетке плей-офф, если они доходят до соответствующих реальных стадий:</p>
+                      
+                      <div class="grid grid-cols-2 gap-2">
+                        <div class="p-2 bg-slate-900 border border-slate-800/80 rounded flex justify-between items-center">
+                          <span class="text-slate-300">Участник 1/8</span>
+                          <span class="font-bold text-yellow-400">+7 баллов</span>
+                        </div>
+                        <div class="p-2 bg-slate-900 border border-slate-800/80 rounded flex justify-between items-center">
+                          <span class="text-slate-300">Участник 1/4</span>
+                          <span class="font-bold text-yellow-400">+8 баллов</span>
+                        </div>
+                        <div class="p-2 bg-slate-900 border border-slate-800/80 rounded flex justify-between items-center">
+                          <span class="text-slate-300">Полуфиналист</span>
+                          <span class="font-bold text-yellow-400">+9 баллов</span>
+                        </div>
+                        <div class="p-2 bg-slate-900 border border-slate-800/80 rounded flex justify-between items-center">
+                          <span class="text-slate-300">Финалист</span>
+                          <span class="font-bold text-yellow-400">+10 баллов</span>
+                        </div>
+                      </div>
+
+                      <div class="p-2.5 bg-yellow-500/10 border border-yellow-500/20 rounded-xl flex justify-between items-center">
+                        <span class="text-yellow-300 font-bold">Победитель ЧМ (Чемпион)</span>
+                        <span class="font-extrabold text-yellow-400 text-sm">+13 баллов</span>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+
+              </div>
+            )}
+
+            {/* TAB CONTENT: ADMIN */}
+            {activeTab === 'admin' && isAdminMode && (
+              <div class="bg-slate-900 p-6 rounded-2xl border border-red-500/30 space-y-6">
+                
+                <div class="flex items-center justify-between border-b border-slate-800 pb-3">
+                  <div>
+                    <h3 class="font-black text-xl text-red-400 flex items-center gap-2">
+                      <i class="fa-solid fa-lock"></i>
+                      ПАНЕЛЬ АДМИНИСТРАТОРА (РЕАЛЬНЫЕ РЕЗУЛЬТАТЫ)
+                    </h3>
+                    <p class="text-xs text-slate-400 mt-1">
+                      Здесь вводятся фактические счета сыгранных матчей. На основе введенных счетов группы <span class="text-emerald-400 font-bold">автоматически</span> строится реальная сетка плей-офф.
+                    </p>
+                  </div>
+                  
+                  <button 
+                    onClick={handleAdminAutoFill}
+                    class="bg-red-500/20 hover:bg-red-500/40 text-red-200 border border-red-500/30 px-3.5 py-1.5 rounded-xl text-xs font-semibold flex items-center gap-1.5 transition"
+                  >
+                    <i class="fa-solid fa-bolt"></i>
+                    <span>⚡ Заполнить реальные группы (Тест)</span>
+                  </button>
+                </div>
+
+                <div class="flex flex-wrap gap-1">
+                  {['A', 'B', 'C', 'D', 'E', 'F', 'G', 'H', 'I', 'J', 'K', 'L'].map(g => (
+                    <button key={g} onClick={() => setAdminGroupTab(g)} class={`w-8 h-8 text-xs font-bold rounded-lg transition ${adminGroupTab === g ? 'bg-red-500 text-white font-black' : 'bg-slate-800 text-slate-300 hover:text-white'}`}>
+                      {g}
+                    </button>
+                  ))}
+                  <div class="w-[1px] h-8 bg-slate-850 mx-1"></div>
+                  <button onClick={() => setAdminGroupTab('ko')} class={`px-3 py-1.5 text-xs font-bold rounded-lg transition ${adminGroupTab === 'ko' ? 'bg-red-500 text-white shadow-md' : 'bg-slate-800 text-slate-300 hover:text-white'}`}>
+                    Сетка плей-офф (Факт)
+                  </button>
+                </div>
+
+                {['A', 'B', 'C', 'D', 'E', 'F', 'G', 'H', 'I', 'J', 'K', 'L'].includes(adminGroupTab) && (
+                  <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    {STATIC_MATCHES.filter(m => m.group === adminGroupTab).map(match => {
+                      const real = realResults.matches?.[match.id] || { home: '', away: '' };
+                      return (
+                        <div key={match.id} class="flex flex-col p-3 bg-slate-950 rounded-xl border border-slate-800 gap-2">
+                          <div class="text-[9px] text-slate-500 font-bold uppercase text-center bg-slate-900 py-0.5 rounded border border-slate-850">
+                            {match.date} &bull; {match.time} &bull; {match.city}
+                          </div>
+                          <div class="flex items-center justify-between mt-1">
+                            <span class="text-xs font-semibold w-1/3 text-right truncate">{TEAMS[match.home].name}</span>
+                            <div class="flex items-center gap-1">
+                              <input
+                                type="number"
+                                placeholder="-"
+                                value={real.home}
+                                onChange={(e) => handleRealScoreChange(match.id, 'home', e.target.value)}
+                                class="w-10 h-8 bg-slate-900 border border-slate-800 focus:border-red-500 text-center font-bold rounded focus:outline-none"
+                              />
+                              <span class="text-slate-600">:</span>
+                              <input
+                                type="number"
+                                placeholder="-"
+                                value={real.away}
+                                onChange={(e) => handleRealScoreChange(match.id, 'away', e.target.value)}
+                                class="w-10 h-8 bg-slate-900 border border-slate-800 focus:border-red-500 text-center font-bold rounded focus:outline-none"
+                              />
+                            </div>
+                            <span class="text-xs font-semibold w-1/3 text-left truncate">{TEAMS[match.away].name}</span>
+                          </div>
+                        </div>
+                      );
+                    })}
+                  </div>
+                )}
+
+                {adminGroupTab === 'ko' && (
+                  <div class="space-y-4">
+                    <div class="flex flex-wrap gap-1 bg-slate-950 p-1.5 rounded-xl border border-slate-850">
+                      {[
+                        { key: 'R32', label: '1/16 финала' },
+                        { key: 'R16', label: '1/8 финала' },
+                        { key: 'QF', label: '1/4 финала' },
+                        { key: 'SF', label: 'Полуфиналы' },
+                        { key: 'F', label: 'Финал' }
+                      ].map(st => (
+                        <button key={st.key} onClick={() => setAdminKoStageTab(st.key)} class={`flex-1 py-1.5 text-xs font-bold rounded ${adminKoStageTab === st.key ? 'bg-red-500 text-white' : 'text-slate-400'}`}>
+                          {st.label}
+                        </button>
+                      ))}
+                    </div>
+
+                    <div class="p-4 bg-slate-950 rounded-xl border border-slate-800 space-y-4">
+                      
+                      {/* ADMIN R32 VIEW */}
+                      {adminKoStageTab === 'R32' && (
+                        <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+                          {Object.keys(realCalculatedBracket.r32Matches).map((matchId, idx) => {
+                            const [t1, t2] = realCalculatedBracket.r32Matches[matchId];
+                            const selected = realResults.ko?.[matchId];
+
+                            return (
+                              <div key={matchId} class="bg-slate-900 p-3 rounded-xl border border-slate-800 space-y-2">
+                                <span class="text-[10px] text-red-400 font-extrabold uppercase">Пара #{idx+1} (1/16)</span>
+                                <div class="space-y-1.5">
+                                  <button onClick={() => handleRealKnockoutAdvance(matchId, t1.code)} class={`w-full flex justify-between p-2 rounded text-xs font-semibold ${selected === t1.code ? 'bg-red-500 text-white' : 'bg-slate-950 text-slate-300 border border-slate-805'}`}>
+                                    <span>{t1.flag} {t1.name}</span>
+                                    {selected === t1.code && <i class="fa-solid fa-check"></i>}
+                                  </button>
+                                  <button onClick={() => handleRealKnockoutAdvance(matchId, t2.code)} class={`w-full flex justify-between p-2 rounded text-xs font-semibold ${selected === t2.code ? 'bg-red-500 text-white' : 'bg-slate-950 text-slate-300 border border-slate-805'}`}>
+                                    <span>{t2.flag} {t2.name}</span>
+                                    {selected === t2.code && <i class="fa-solid fa-check"></i>}
+                                  </button>
+                                </div>
+                              </div>
+                            );
+                          })}
+                        </div>
+                      )}
+
+                      {/* ADMIN R16 VIEW */}
+                      {adminKoStageTab === 'R16' && (
+                        <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+                          {Object.keys(realCalculatedBracket.r16Matches).map((matchId, idx) => {
+                            const [t1, t2] = realCalculatedBracket.r16Matches[matchId];
+                            const selected = realResults.ko?.[matchId];
+
+                            return (
+                              <div key={matchId} class="bg-slate-900 p-3 rounded-xl border border-slate-800 space-y-2">
+                                <span class="text-[10px] text-red-400 font-extrabold uppercase">Пара #{idx+1} (1/8)</span>
+                                <div class="space-y-1.5">
+                                  <button onClick={() => handleRealKnockoutAdvance(matchId, t1.code)} class={`w-full flex justify-between p-2 rounded text-xs font-semibold ${selected === t1.code ? 'bg-red-500 text-white' : 'bg-slate-950 text-slate-300 border border-slate-805'}`}>
+                                    <span>{t1.flag} {t1.name}</span>
+                                    {selected === t1.code && <i class="fa-solid fa-check"></i>}
+                                  </button>
+                                  <button onClick={() => handleRealKnockoutAdvance(matchId, t2.code)} class={`w-full flex justify-between p-2 rounded text-xs font-semibold ${selected === t2.code ? 'bg-red-500 text-white' : 'bg-slate-950 text-slate-300 border border-slate-805'}`}>
+                                    <span>{t2.flag} {t2.name}</span>
+                                    {selected === t2.code && <i class="fa-solid fa-check"></i>}
+                                  </button>
+                                </div>
+                              </div>
+                            );
+                          })}
+                        </div>
+                      )}
+
+                      {/* ADMIN QF VIEW */}
+                      {adminKoStageTab === 'QF' && (
+                        <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                          {Object.keys(realCalculatedBracket.qfMatches).map((matchId, idx) => {
+                            const [t1, t2] = realCalculatedBracket.qfMatches[matchId];
+                            const selected = realResults.ko?.[matchId];
+
+                            return (
+                              <div key={matchId} class="bg-slate-900 p-4 rounded-xl border border-slate-800 space-y-3">
+                                <span class="text-[10px] text-red-400 font-extrabold uppercase">Четвертьфинал {idx+1}</span>
+                                <div class="space-y-2">
+                                  <button onClick={() => handleRealKnockoutAdvance(matchId, t1.code)} class={`w-full flex justify-between p-2 rounded text-xs font-semibold ${selected === t1.code ? 'bg-red-500 text-white' : 'bg-slate-950 text-slate-300 border border-slate-800'}`}>
+                                    <span>{t1 ? `${t1.flag} ${t1.name}` : 'Пусто'}</span>
+                                    {selected === t1?.code && <i class="fa-solid fa-check"></i>}
+                                  </button>
+                                  <button onClick={() => handleRealKnockoutAdvance(matchId, t2.code)} class={`w-full flex justify-between p-2 rounded text-xs font-semibold ${selected === t2.code ? 'bg-red-500 text-white' : 'bg-slate-950 text-slate-300 border border-slate-800'}`}>
+                                    <span>{t2 ? `${t2.flag} ${t2.name}` : 'Пусто'}</span>
+                                    {selected === t2?.code && <i class="fa-solid fa-check"></i>}
+                                  </button>
+                                </div>
+                              </div>
+                            );
+                          })}
+                        </div>
+                      )}
+
+                      {/* ADMIN SF VIEW */}
+                      {adminKoStageTab === 'SF' && (
+                        <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                          {Object.keys(realCalculatedBracket.sfMatches).map((matchId, idx) => {
+                            const [t1, t2] = realCalculatedBracket.sfMatches[matchId];
+                            const selected = realResults.ko?.[matchId];
+
+                            return (
+                              <div key={matchId} class="bg-slate-900 p-4 rounded-xl border border-slate-800 space-y-3">
+                                <span class="text-[10px] text-red-400 font-extrabold uppercase">Полуфинал {idx+1}</span>
+                                <div class="space-y-2">
+                                  <button onClick={() => handleRealKnockoutAdvance(matchId, t1.code)} class={`w-full flex justify-between p-2 rounded text-xs font-semibold ${selected === t1.code ? 'bg-red-500 text-white' : 'bg-slate-950 text-slate-300 border border-slate-800'}`}>
+                                    <span>{t1 ? `${t1.flag} ${t1.name}` : 'Пусто'}</span>
+                                    {selected === t1?.code && <i class="fa-solid fa-check"></i>}
+                                  </button>
+                                  <button onClick={() => handleRealKnockoutAdvance(matchId, t2.code)} class={`w-full flex justify-between p-2 rounded text-xs font-semibold ${selected === t2.code ? 'bg-red-500 text-white' : 'bg-slate-950 text-slate-300 border border-slate-800'}`}>
+                                    <span>{t2 ? `${t2.flag} ${t2.name}` : 'Пусто'}</span>
+                                    {selected === t2?.code && <i class="fa-solid fa-check"></i>}
+                                  </button>
+                                </div>
+                              </div>
+                            );
+                          })}
+                        </div>
+                      )}
+
+                      {/* ADMIN F VIEW */}
+                      {adminKoStageTab === 'F' && (
+                        <div class="max-w-md mx-auto bg-slate-900 p-5 rounded-xl border border-slate-800 space-y-4">
+                          <span class="text-xs text-red-400 font-extrabold uppercase text-center block">Финал</span>
+                          {Object.keys(realCalculatedBracket.finalMatches).map((matchId) => {
+                            const [t1, t2] = realCalculatedBracket.finalMatches[matchId];
+                            const selected = realResults.ko?.[matchId];
+
+                            return (
+                              <div key={matchId} class="space-y-3">
+                                <button onClick={() => handleRealKnockoutAdvance(matchId, t1.code)} class={`w-full flex justify-between p-2.5 rounded text-xs font-semibold ${selected === t1.code ? 'bg-red-500 text-white font-black' : 'bg-slate-950 text-slate-300 border border-slate-800'}`}>
+                                  <span>{t1 ? `${t1.flag} ${t1.name}` : 'Пусто'}</span>
+                                  {selected === t1?.code && <i class="fa-solid fa-crown"></i>}
+                                </button>
+                                <div class="text-center text-[10px] text-slate-500 font-bold">ФАКТИЧЕСКИЙ ЧЕМПИОН ЧМ:</div>
+                                <button onClick={() => handleRealKnockoutAdvance(matchId, t2.code)} class={`w-full flex justify-between p-2.5 rounded text-xs font-semibold ${selected === t2.code ? 'bg-red-500 text-white font-black' : 'bg-slate-950 text-slate-300 border border-slate-800'}`}>
+                                  <span>{t2 ? `${t2.flag} ${t2.name}` : 'Пусто'}</span>
+                                  {selected === t2?.code && <i class="fa-solid fa-crown"></i>}
+                                </button>
+                              </div>
+                            );
+                          })}
+                        </div>
+                      )}
+                    </div>
+                  </div>
+                )}
+
+              </div>
+            )}
+
+          </main>
+
+          {/* DETAILED PLAYER PROGNOSIS MODAL */}
+          {selectedPlayerDetails && (
+            <div class="fixed inset-0 bg-slate-950/80 backdrop-blur-md flex items-center justify-center p-4 z-50">
+              <div class="bg-slate-900 border border-slate-800 rounded-2xl w-full max-w-4xl max-h-[85vh] flex flex-col shadow-2xl text-xs">
+                
+                {/* Header */}
+                <div class="p-5 border-b border-slate-800 flex items-center justify-between">
+                  <div>
+                    <h3 class="text-lg font-extrabold text-emerald-400">Прогнозы игрока: {selectedPlayerDetails.username}</h3>
+                    <p class="text-xs text-slate-400 mt-1 font-semibold">Итого набранных очков: <span class="font-bold text-yellow-400 text-sm">{selectedPlayerDetails.scoreObj.totalPoints}</span></p>
+                  </div>
+                  <button 
+                    onClick={() => setSelectedPlayerDetailId(null)}
+                    class="text-slate-400 hover:text-slate-100 p-1 bg-slate-800 hover:bg-slate-750 rounded-lg transition"
+                  >
+                    <i class="fa-solid fa-xmark text-lg"></i>
+                  </button>
+                </div>
+
+                {/* Content */}
+                <div class="p-5 overflow-y-auto space-y-6 flex-grow">
+                  
+                  {/* Groups stats breakdown */}
+                  <h4 class="font-extrabold text-sm text-emerald-400 border-b border-slate-800 pb-2">Продвижение из групп (Прогноз игрока)</h4>
+                  <div class="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-6 gap-3">
+                    {['A', 'B', 'C', 'D', 'E', 'F', 'G', 'H', 'I', 'J', 'K', 'L'].map(g => {
+                      const topTeams = selectedPlayerDetails.standings.standings[g].slice(0, 3);
+                      return (
+                        <div key={g} class="bg-slate-950 p-2.5 rounded-xl border border-slate-850 space-y-1">
+                          <h4 class="font-bold text-slate-300 text-[10px]">Группа {g}</h4>
+                          <div class="space-y-1 text-[10px]">
+                            {topTeams.map((team, idx) => {
+                              const isAdv = idx < 2 || selectedPlayerDetails.standings.best3rd.includes(team.code);
+                              return (
+                                <div key={team.code} class="flex items-center justify-between">
+                                  <span class="text-slate-400 truncate max-w-[70px]">{idx+1}. {team.flag} {team.name}</span>
+                                  <span class={`font-bold text-[9px] px-1 rounded ${isAdv ? 'bg-emerald-500/10 text-emerald-400' : 'bg-slate-800 text-slate-500'}`}>
+                                    {isAdv ? '1/16' : 'Вылет'}
+                                  </span>
+                                </div>
+                              );
+                            })}
+                          </div>
+                        </div>
+                      );
+                    })}
+                  </div>
+
+                  {/* Bracket detail */}
+                  <div class="bg-slate-950 p-4 rounded-xl border border-slate-800 space-y-4">
+                    <h4 class="font-extrabold text-sm text-yellow-400 border-b border-slate-800 pb-2">Сетка плей-офф прогнозиста</h4>
+                    <div class="grid grid-cols-2 md:grid-cols-5 gap-3">
+                      
+                      <div class="space-y-1 bg-slate-900/60 p-2.5 rounded border border-slate-850">
+                        <span class="text-[9px] text-slate-400 uppercase font-bold">Вышли в 1/8</span>
+                        <div class="space-y-1 font-semibold text-slate-300 max-h-36 overflow-y-auto">
+                          {selectedPlayerDetails.bracket.r16.length > 0 ? (
+                            selectedPlayerDetails.bracket.r16.map(code => <div key={code} class="truncate">{renderTeamName(code)}</div>)
+                          ) : (
+                            <span class="text-slate-600">Пусто</span>
+                          )}
+                        </div>
+                      </div>
+
+                      <div class="space-y-1 bg-slate-900/60 p-2.5 rounded border border-slate-850">
+                        <span class="text-[9px] text-slate-400 uppercase font-bold">Вышли в 1/4</span>
+                        <div class="space-y-1 font-semibold text-slate-300 max-h-36 overflow-y-auto">
+                          {selectedPlayerDetails.bracket.qf.length > 0 ? (
+                            selectedPlayerDetails.bracket.qf.map(code => <div key={code} class="truncate">{renderTeamName(code)}</div>)
+                          ) : (
+                            <span class="text-slate-600">Пусто</span>
+                          )}
+                        </div>
+                      </div>
+
+                      <div class="space-y-1 bg-slate-900/60 p-2.5 rounded border border-slate-850">
+                        <span class="text-[9px] text-slate-400 uppercase font-bold">Вышли в 1/2</span>
+                        <div class="space-y-1 font-semibold text-slate-300 max-h-36 overflow-y-auto">
+                          {selectedPlayerDetails.bracket.sf.length > 0 ? (
+                            selectedPlayerDetails.bracket.sf.map(code => <div key={code} class="truncate">{renderTeamName(code)}</div>)
+                          ) : (
+                            <span class="text-slate-600">Пусто</span>
+                          )}
+                        </div>
+                      </div>
+
+                      <div class="space-y-1 bg-slate-900/60 p-2.5 rounded border border-slate-850">
+                        <span class="text-[9px] text-slate-400 uppercase font-bold">Финалисты</span>
+                        <div class="space-y-1 font-semibold text-slate-300 max-h-36 overflow-y-auto">
+                          {selectedPlayerDetails.bracket.f.length > 0 ? (
+                            selectedPlayerDetails.bracket.f.map(code => <div key={code} class="truncate">{renderTeamName(code)}</div>)
+                          ) : (
+                            <span class="text-slate-600">Пусто</span>
+                          )}
+                        </div>
+                      </div>
+
+                      <div class="space-y-1 bg-yellow-500/5 p-2.5 rounded border border-yellow-500/20">
+                        <span class="text-[9px] text-yellow-400 uppercase font-bold">Победитель</span>
+                        <div class="font-extrabold text-yellow-300 mt-1">
+                          {selectedPlayerDetails.bracket.champion ? (
+                            renderTeamName(selectedPlayerDetails.bracket.champion)
+                          ) : (
+                            <span class="text-slate-600">Пусто</span>
+                          )}
+                        </div>
+                      </div>
+
+                    </div>
+                  </div>
+
+                </div>
+
+                {/* Footer */}
+                <div class="p-4 border-t border-slate-800 bg-slate-950/40 rounded-b-2xl text-right font-bold">
+                  <button 
+                    onClick={() => setSelectedPlayerDetailId(null)}
+                    class="bg-emerald-500 hover:bg-emerald-600 text-slate-950 px-4 py-2 rounded-xl text-xs transition"
+                  >
+                    Закрыть
+                  </button>
+                </div>
+
+              </div>
+            </div>
+          )}
+
+          {/* CONFIRM MODAL FOR SUBMIT */}
+          {showSubmitConfirm && (
+            <div class="fixed inset-0 bg-slate-950/90 backdrop-blur-md flex items-center justify-center p-4 z-50 animate-fade-in">
+              <div class="bg-slate-900 border-2 border-amber-500/30 rounded-2xl w-full max-w-md p-6 space-y-4 shadow-2xl text-center">
+                <div class="text-amber-400 text-4xl">
+                  <i class="fa-solid fa-triangle-exclamation"></i>
+                </div>
+                <h3 class="text-lg font-extrabold text-slate-100 uppercase">Подтверждение фиксации</h3>
+                <p class="text-xs text-slate-400 px-2 leading-relaxed">
+                  {submitWarningMsg}
+                </p>
+                <div class="flex gap-3 pt-2">
+                  <button 
+                    onClick={() => setShowSubmitConfirm(false)}
+                    class="flex-1 bg-slate-800 hover:bg-slate-750 text-slate-300 font-bold py-2.5 rounded-xl text-xs transition"
+                  >
+                    Отмена
+                  </button>
+                  <button 
+                    onClick={confirmSubmitLock}
+                    class="flex-1 bg-amber-500 hover:bg-amber-600 text-slate-950 font-black py-2.5 rounded-xl text-xs transition shadow-lg shadow-amber-500/10"
+                  >
+                    Да, заблокировать!
+                  </button>
+                </div>
+              </div>
+            </div>
+          )}
+
+          {/* ADMIN PASSWORD MODAL */}
+          {showAdminPasswordModal && (
+            <div class="fixed inset-0 bg-slate-950/90 backdrop-blur-md flex items-center justify-center p-4 z-50 animate-fade-in">
+              <div class="bg-slate-900 border-2 border-red-500/30 rounded-2xl w-full max-w-sm p-6 space-y-4 shadow-2xl text-center">
+                <div class="text-red-400 text-4xl">
+                  <i class="fa-solid fa-lock"></i>
+                </div>
+                <h3 class="text-lg font-extrabold text-slate-100 uppercase">Вход в режим админа</h3>
+                <p class="text-xs text-slate-400 px-2">
+                  Для изменения официальных результатов введите секретный пароль администратора.
+                </p>
+                
+                <div class="space-y-3">
+                  <input 
+                    type="password" 
+                    value={adminPasswordInput}
+                    onChange={(e) => {
+                      setAdminPasswordInput(e.target.value);
+                      if (adminPasswordError) setAdminPasswordError('');
+                    }}
+                    onKeyDown={(e) => {
+                      if (e.key === 'Enter') {
+                        handleAdminPasswordSubmit();
+                      }
+                    }}
+                    class="w-full bg-slate-950 border border-slate-850 text-slate-100 px-4 py-2.5 rounded-xl text-center text-sm font-semibold focus:outline-none focus:border-red-500 transition-colors"
+                    placeholder="Введите пароль"
+                    autoFocus
+                  />
+                  {adminPasswordError && (
+                    <p class="text-xs text-red-500 font-semibold animate-pulse">{adminPasswordError}</p>
+                  )}
+                </div>
+
+                <div class="flex gap-3 pt-2">
+                  <button 
+                    onClick={() => setShowAdminPasswordModal(false)}
+                    class="flex-1 bg-slate-800 hover:bg-slate-750 text-slate-300 font-bold py-2 rounded-xl text-xs transition"
+                  >
+                    Отмена
+                  </button>
+                  <button 
+                    onClick={handleAdminPasswordSubmit}
+                    class="flex-1 bg-red-500 hover:bg-red-600 text-white font-bold py-2 rounded-xl text-xs transition shadow-lg shadow-red-500/10"
+                  >
+                    Войти
+                  </button>
+                </div>
+              </div>
+            </div>
+          )}
+
+          {/* FOOTER */}
+          <footer class="bg-slate-950 border-t border-slate-900 text-center py-6 px-4 mt-auto">
+            <p class="text-xs text-slate-500">⚽ Предиктор Чемпионата Мира. Все права на турниры принадлежат FIFA.</p>
+            <p class="text-[10px] text-slate-600 mt-1">Создано с использованием React, Tailwind CSS & Firebase Cloud Sync</p>
+          </footer>
+
+        </div>
+      );
+    }
+
+    const container = document.getElementById('root');
+    const root = ReactDOM.createRoot(container);
+    root.render(<App />);
+  </script>
+</body>
+</html>
