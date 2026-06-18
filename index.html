@@ -20,9 +20,9 @@
   <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
 
   <!-- Firebase legacy compat wrappers inside sandboxed environment -->
-  <script src="https://www.gstatic.com/firebasejs/11.1.0/firebase-app-compat.js"></script>
-  <script src="https://www.gstatic.com/firebasejs/11.1.0/firebase-auth-compat.js"></script>
-  <script src="https://www.gstatic.com/firebasejs/11.1.0/firebase-firestore-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/11.1.0/firebase-app-compat.js" crossorigin="anonymous"></script>
+  <script src="https://www.gstatic.com/firebasejs/11.1.0/firebase-auth-compat.js" crossorigin="anonymous"></script>
+  <script src="https://www.gstatic.com/firebasejs/11.1.0/firebase-firestore-compat.js" crossorigin="anonymous"></script>
 
   <style>
     body {
@@ -71,7 +71,7 @@
     window._auth = firebase.auth();
   </script>
 
-  <script type="text/babel" data-presets="react">
+  <script type="text/babel" data-presets="react,env">
     const { useState, useEffect, useMemo } = React;
 
     // --- STATIC DATA: 48 TEAMS (WORLD CUP 2026 ACTUAL USER GROUPS) ---
