@@ -13,16 +13,24 @@
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
   
-  <!-- React and ReactDOM -->
-  <script src="https://unpkg.com/react@18/umd/react.production.min.js" crossorigin></script>
-  <script src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js" crossorigin></script>
+  <!-- Import Map for React to work with Babel automatic JSX runtime -->
+  <script type="importmap">
+    {
+      "imports": {
+        "react": "https://esm.sh/react@18.2.0",
+        "react-dom/client": "https://esm.sh/react-dom@18.2.0/client",
+        "react/jsx-runtime": "https://esm.sh/react@18.2.0/jsx-runtime"
+      }
+    }
+  </script>
+
   <!-- Babel for JSX -->
   <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
 
   <!-- Firebase legacy compat wrappers inside sandboxed environment -->
-  <script src="https://www.gstatic.com/firebasejs/11.1.0/firebase-app-compat.js" crossorigin="anonymous"></script>
-  <script src="https://www.gstatic.com/firebasejs/11.1.0/firebase-auth-compat.js" crossorigin="anonymous"></script>
-  <script src="https://www.gstatic.com/firebasejs/11.1.0/firebase-firestore-compat.js" crossorigin="anonymous"></script>
+  <script src="https://www.gstatic.com/firebasejs/11.1.0/firebase-app-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/11.1.0/firebase-auth-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/11.1.0/firebase-firestore-compat.js"></script>
 
   <style>
     body {
@@ -55,24 +63,9 @@
 
   <div id="root"></div>
 
-  <script>
-    // Firebase инициализация вне Babel-контекста
-    const firebaseConfig = {
-      apiKey: "AIzaSyBnJH-xvU_5HEG-X62ji_Grq81KLbXlW_s",
-      authDomain: "ch2026-aca38.firebaseapp.com",
-      projectId: "ch2026-aca38",
-      storageBucket: "ch2026-aca38.firebasestorage.app",
-      messagingSenderId: "672038319705",
-      appId: "1:672038319705:web:8e0ae61199dbfc582b6348",
-      measurementId: "G-M6MY1DC3QE"
-    };
-    firebase.initializeApp(firebaseConfig);
-    window._db = firebase.firestore();
-    window._auth = firebase.auth();
-  </script>
-
-  <script type="text/babel" data-presets="react,env">
-    const { useState, useEffect, useMemo } = React;
+  <script type="text/babel" data-type="module">
+    import React, { useState, useEffect, useMemo } from 'react';
+    import { createRoot } from 'react-dom/client';
 
     // --- STATIC DATA: 48 TEAMS (WORLD CUP 2026 ACTUAL USER GROUPS) ---
     const TEAMS = {
@@ -600,11 +593,27 @@
       };
     }
 
-    // --- FIREBASE CONSTANTS (инициализация вынесена в отдельный script выше) ---
-    const db = window._db;
-    const auth = window._auth;
-    const appId = 'world-cup-predictor-48';
-    const firebaseEnabled = true;
+    // --- FIREBASE INITIALIZATION & CONSTANTS ---
+    const firebaseConfig = typeof __firebase_config !== 'undefined' ? JSON.parse(__firebase_config) : {
+      apiKey: "AIzaSyBnJH-xvU_5HEG-X62ji_Grq81KLbXlW_s",
+      authDomain: "ch2026-aca38.firebaseapp.com",
+      projectId: "ch2026-aca38",
+      storageBucket: "ch2026-aca38.firebasestorage.app",
+      messagingSenderId: "672038319705",
+      appId: "1:672038319705:web:8e0ae61199dbfc582b6348",
+      measurementId: "G-M6MY1DC3QE"
+    };
+
+    // Инициализируем Firebase
+    if (!window.firebase.apps.length) {
+      window.firebase.initializeApp(firebaseConfig);
+    }
+
+    // Создаем глобальные переменные для связи с базой (без дубликатов let/const в других местах)
+    const db = window.firebase.firestore();
+    const auth = window.firebase.auth();
+    const appId = typeof __app_id !== 'undefined' ? __app_id : 'world-cup-predictor-48';
+    const firebaseEnabled = true; // Принудительно включаем синхронизацию с облаком
 
     // --- MAIN REACT COMPONENT ---
     function App() {
@@ -695,7 +704,7 @@
         }
 
         // Firebase Sync
-        const resultsRef = db.collection('artifacts').doc(appId).collection('public').doc('results').collection('data').doc('global');
+        const resultsRef = db.collection('artifacts').doc(appId).collection('public').doc('data').collection('results').doc('global');
         const unsubResults = resultsRef.onSnapshot((docSnap) => {
           if (docSnap.exists) {
             setRealResults(docSnap.data());
@@ -805,7 +814,7 @@
         }
 
         try {
-          const resultsRef = db.collection('artifacts').doc(appId).collection('public').doc('results').collection('data').doc('global');
+          const resultsRef = db.collection('artifacts').doc(appId).collection('public').doc('data').collection('results').doc('global');
           await resultsRef.set(updatedResults);
         } catch (err) {
           console.error("Save real results failed:", err);
@@ -2262,7 +2271,7 @@
     }
 
     const container = document.getElementById('root');
-    const root = ReactDOM.createRoot(container);
+    const root = createRoot(container);
     root.render(<App />);
   </script>
 </body>
