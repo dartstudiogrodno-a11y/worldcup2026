@@ -55,8 +55,23 @@
 
   <div id="root"></div>
 
+  <script>
+    // Firebase инициализация вне Babel-контекста
+    const firebaseConfig = {
+      apiKey: "AIzaSyBnJH-xvU_5HEG-X62ji_Grq81KLbXlW_s",
+      authDomain: "ch2026-aca38.firebaseapp.com",
+      projectId: "ch2026-aca38",
+      storageBucket: "ch2026-aca38.firebasestorage.app",
+      messagingSenderId: "672038319705",
+      appId: "1:672038319705:web:8e0ae61199dbfc582b6348",
+      measurementId: "G-M6MY1DC3QE"
+    };
+    firebase.initializeApp(firebaseConfig);
+    window._db = firebase.firestore();
+    window._auth = firebase.auth();
+  </script>
+
   <script type="text/babel">
-  /** @jsxRuntime classic */
     const { useState, useEffect, useMemo } = React;
 
     // --- STATIC DATA: 48 TEAMS (WORLD CUP 2026 ACTUAL USER GROUPS) ---
@@ -585,25 +600,11 @@
       };
     }
 
-    // --- FIREBASE INITIALIZATION & CONSTANTS ---
-    const firebaseConfig = {
-      apiKey: "AIzaSyBnJH-xvU_5HEG-X62ji_Grq81KLbXlW_s",
-      authDomain: "ch2026-aca38.firebaseapp.com",
-      projectId: "ch2026-aca38",
-      storageBucket: "ch2026-aca38.firebasestorage.app",
-      messagingSenderId: "672038319705",
-      appId: "1:672038319705:web:8e0ae61199dbfc582b6348",
-      measurementId: "G-M6MY1DC3QE"
-    };
-
-    // Инициализируем Firebase
-    firebase.initializeApp(firebaseConfig);
-
-    // Создаем глобальные переменные для связи с базой (без дубликатов let/const в других местах)
-    const db = firebase.firestore();
-    const auth = firebase.auth();
+    // --- FIREBASE CONSTANTS (инициализация вынесена в отдельный script выше) ---
+    const db = window._db;
+    const auth = window._auth;
     const appId = 'world-cup-predictor-48';
-    const firebaseEnabled = true; // Принудительно включаем синхронизацию с облаком
+    const firebaseEnabled = true;
 
     // --- MAIN REACT COMPONENT ---
     function App() {
