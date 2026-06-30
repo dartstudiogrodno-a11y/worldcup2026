@@ -521,13 +521,8 @@
       });
 
       // 2. Advancing group outcome & Knockouts.
-      //    Group-advance points (+5) require the real group stage to be fully filled.
-      //    Knockout-stage points are awarded as soon as the admin marks who really advanced
-      //    (no fixed bracket of pairs is used for the real side anymore).
-      const isGroupStageFinished = STATIC_MATCHES.every(m => {
-        const real = realMatches[m.id];
-        return real && real.home !== undefined && real.away !== undefined && real.home !== '' && real.away !== '';
-      });
+      //    All stage points (+5 for groups, +7/+8/...) are awarded as soon as the admin
+      //    marks who really advanced (manual selection per stage, no auto bracket).
 
       let correctAdvancingCount = 0;
       let r16Points = 0;
@@ -543,7 +538,7 @@
       const realAdvanced = realResults?.advanced || {};
       const cleanList = (arr) => (Array.isArray(arr) ? arr : []).filter(code => code && !String(code).startsWith('?'));
 
-      const cleanRealR32 = isGroupStageFinished ? cleanList(calculateStandings(realMatches).advancing) : [];
+      const cleanRealR32 = cleanList(realAdvanced.r32);
       const cleanRealR16 = cleanList(realAdvanced.r16);
       const cleanRealQf = cleanList(realAdvanced.qf);
       const cleanRealSf = cleanList(realAdvanced.sf);
@@ -631,7 +626,7 @@
       const [userId, setUserId] = useState(null);
       const [myProfile, setMyProfile] = useState({ username: '', registered: false });
       const [myPredictions, setMyPredictions] = useState({ matches: {}, ko: {}, submitted: false });
-      const [realResults, setRealResults] = useState({ matches: {}, ko: {}, advanced: { r16: [], qf: [], sf: [], f: [], champion: '' } });
+      const [realResults, setRealResults] = useState({ matches: {}, ko: {}, advanced: { r32: [], r16: [], qf: [], sf: [], f: [], champion: '' } });
       const [allPredictions, setAllPredictions] = useState({});
       const [allUsers, setAllUsers] = useState({});
 
@@ -706,7 +701,7 @@
 
           setMyPredictions(offlinePreds ? JSON.parse(offlinePreds) : { matches: {}, ko: {}, submitted: false });
           setMyProfile(offlineProfile ? JSON.parse(offlineProfile) : { username: '', registered: false });
-          setRealResults(offlineResults ? JSON.parse(offlineResults) : { matches: {}, ko: {}, advanced: { r16: [], qf: [], sf: [], f: [], champion: '' } });
+          setRealResults(offlineResults ? JSON.parse(offlineResults) : { matches: {}, ko: {}, advanced: { r32: [], r16: [], qf: [], sf: [], f: [], champion: '' } });
 
           setAllPredictions({ [userId]: offlinePreds ? JSON.parse(offlinePreds) : { matches: {}, ko: {}, submitted: false } });
           setAllUsers({ [userId]: offlineProfile ? JSON.parse(offlineProfile) : { username: '', registered: false } });
@@ -719,7 +714,7 @@
           if (docSnap.exists) {
             setRealResults(docSnap.data());
           } else {
-            resultsRef.set({ matches: {}, ko: {}, advanced: { r16: [], qf: [], sf: [], f: [], champion: '' } });
+            resultsRef.set({ matches: {}, ko: {}, advanced: { r32: [], r16: [], qf: [], sf: [], f: [], champion: '' } });
           }
         }, err => console.error("Error results sync:", err));
 
@@ -915,18 +910,15 @@
       }, [myPredictions.matches, myPredictions.ko]);
 
       // --- REAL/ADMIN ADVANCEMENT RESOLUTION ---
-      // Teams that actually came out of the groups (no fixed bracket of pairs).
-      const realAdvancingList = useMemo(() => {
-        return calculateStandings(realResults.matches || {}).advancing || [];
-      }, [realResults.matches]);
-
-      const realAdvanced = realResults.advanced || { r16: [], qf: [], sf: [], f: [], champion: '' };
-      const realGroupStageFinished = useMemo(() => {
-        return STATIC_MATCHES.every(m => {
-          const real = realResults.matches?.[m.id];
-          return real && real.home !== undefined && real.away !== undefined && real.home !== '' && real.away !== '';
+      const realAdvanced = realResults.advanced || { r32: [], r16: [], qf: [], sf: [], f: [], champion: '' };
+      const allTeamsByGroup = useMemo(() => {
+        const groups = {};
+        ['A', 'B', 'C', 'D', 'E', 'F', 'G', 'H', 'I', 'J', 'K', 'L'].forEach(g => { groups[g] = []; });
+        Object.values(TEAMS).forEach(t => {
+          if (groups[t.group]) groups[t.group].push(t);
         });
-      }, [realResults.matches]);
+        return groups;
+      }, []);
 
       const leaderboard = useMemo(() => {
         const board = Object.keys(allPredictions).map(pId => {
@@ -986,7 +978,7 @@
 
       // Toggle a team's presence in a real knockout stage advancement list
       const handleRealAdvanceToggle = (stage, code) => {
-        const base = realResults.advanced || { r16: [], qf: [], sf: [], f: [], champion: '' };
+        const base = realResults.advanced || { r32: [], r16: [], qf: [], sf: [], f: [], champion: '' };
         const currentList = Array.isArray(base[stage]) ? base[stage] : [];
         const exists = currentList.includes(code);
         const nextList = exists ? currentList.filter(c => c !== code) : [...currentList, code];
@@ -995,7 +987,7 @@
 
         // If a team is removed from a stage, also drop it from all deeper stages
         if (exists) {
-          const order = ['r16', 'qf', 'sf', 'f'];
+          const order = ['r32', 'r16', 'qf', 'sf', 'f'];
           const startIdx = order.indexOf(stage);
           if (startIdx !== -1) {
             for (let i = startIdx + 1; i < order.length; i++) {
@@ -1011,7 +1003,7 @@
       };
 
       const handleRealChampion = (code) => {
-        const base = realResults.advanced || { r16: [], qf: [], sf: [], f: [], champion: '' };
+        const base = realResults.advanced || { r32: [], r16: [], qf: [], sf: [], f: [], champion: '' };
         const updatedAdvanced = { ...base, champion: base.champion === code ? '' : code };
         const updated = { ...realResults, advanced: updatedAdvanced };
         saveRealResults(updated);
@@ -1048,7 +1040,7 @@
         if (cleanSource.length === 0) {
           return (
             <p class="text-slate-500 text-xs text-center py-6">
-              Сначала отметьте прошедшие команды на предыдущей стадии (или заполните результаты групп).
+              Сначала отметьте прошедшие команды на предыдущей стадии.
             </p>
           );
         }
@@ -1069,6 +1061,38 @@
                   </button>
                 );
               })}
+            </div>
+          </div>
+        );
+      };
+
+      // R32 admin: all 48 teams grouped by letter — admin picks who advanced from groups.
+      const renderGroupAdvanceChecklist = () => {
+        const selectedList = Array.isArray(realAdvanced.r32) ? realAdvanced.r32 : [];
+        const groupNames = ['A', 'B', 'C', 'D', 'E', 'F', 'G', 'H', 'I', 'J', 'K', 'L'];
+
+        return (
+          <div class="space-y-3">
+            <div class="text-[11px] text-slate-400 font-semibold">
+              Отметьте, кто реально вышел из групп. Выбрано: <span class="text-emerald-400 font-bold">{selectedList.length}</span>/32
+            </div>
+            <div class="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-3">
+              {groupNames.map(g => (
+                <div key={g} class="bg-slate-900 p-2.5 rounded-xl border border-slate-800 space-y-1.5">
+                  <h4 class="font-bold text-red-400 text-[10px] uppercase">Группа {g}</h4>
+                  <div class="space-y-1">
+                    {(allTeamsByGroup[g] || []).map(t => {
+                      const isSel = selectedList.includes(t.code);
+                      return (
+                        <button key={t.code} onClick={() => handleRealAdvanceToggle('r32', t.code)} class={`w-full flex justify-between items-center p-1.5 rounded text-[11px] font-semibold transition ${isSel ? 'bg-red-500 text-white' : 'bg-slate-950 text-slate-300 border border-slate-800 hover:border-slate-700'}`}>
+                          <span class="truncate">{t.flag} {t.name}</span>
+                          {isSel && <i class="fa-solid fa-check ml-1 shrink-0"></i>}
+                        </button>
+                      );
+                    })}
+                  </div>
+                </div>
+              ))}
             </div>
           </div>
         );
@@ -1993,37 +2017,11 @@
 
                     <div class="p-4 bg-slate-950 rounded-xl border border-slate-800 space-y-4">
 
-                      {/* ADMIN R32 VIEW: реально вышедшие из групп (только просмотр) */}
-                      {adminKoStageTab === 'R32' && (
-                        <div class="space-y-3">
-                          {!realGroupStageFinished && (
-                            <p class="text-amber-400/90 text-[11px] font-semibold bg-amber-500/10 border border-amber-500/20 rounded-lg p-2">
-                              Заполните все результаты групп, чтобы список вышедших стал окончательным. Сейчас показан расчёт по уже введённым матчам.
-                            </p>
-                          )}
-                          <div class="text-[11px] text-slate-400 font-semibold">
-                            Реально вышли из групп: <span class="text-emerald-400 font-bold">{realAdvancingList.filter(c => c && !String(c).startsWith('?')).length}</span> команд(ы)
-                          </div>
-                          {realAdvancingList.filter(c => c && !String(c).startsWith('?')).length === 0 ? (
-                            <p class="text-slate-500 text-xs text-center py-6">Заполните результаты групповых матчей.</p>
-                          ) : (
-                            <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-2">
-                              {realAdvancingList.filter(c => c && !String(c).startsWith('?')).map(code => {
-                                const t = TEAMS[code] || { code, name: code, flag: '⚽' };
-                                return (
-                                  <div key={code} class="flex items-center gap-2 p-2 rounded text-xs font-semibold bg-slate-900 text-slate-300 border border-slate-800">
-                                    <i class="fa-solid fa-circle-check text-emerald-500"></i>
-                                    <span>{t.flag} {t.name}</span>
-                                  </div>
-                                );
-                              })}
-                            </div>
-                          )}
-                        </div>
-                      )}
+                      {/* ADMIN R32 VIEW: вручную отмечаем вышедших из групп */}
+                      {adminKoStageTab === 'R32' && renderGroupAdvanceChecklist()}
 
                       {/* ADMIN R16 VIEW: кто прошёл в 1/8 */}
-                      {adminKoStageTab === 'R16' && renderAdvanceChecklist('r16', realAdvancingList, 16)}
+                      {adminKoStageTab === 'R16' && renderAdvanceChecklist('r16', realAdvanced.r32, 16)}
 
                       {/* ADMIN QF VIEW: кто прошёл в 1/4 */}
                       {adminKoStageTab === 'QF' && renderAdvanceChecklist('qf', realAdvanced.r16, 8)}
