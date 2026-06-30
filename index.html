@@ -464,6 +464,12 @@
       };
     }
 
+    // --- MANUAL SCORE ADJUSTMENTS (by exact username) ---
+    // Applied on top of the calculated total. Used for one-off corrections without touching the DB.
+    const MANUAL_SCORE_ADJUSTMENTS = { 'Димон': 6 };
+    const getManualAdjustment = (username) => MANUAL_SCORE_ADJUSTMENTS[(username || '').trim()] || 0;
+    const getAdjustedTotal = (username, scoreObj) => (scoreObj?.totalPoints || 0) + getManualAdjustment(username);
+
     // --- SCORING CALCULATION ENGINE ---
     function calculateUserScore(userPred, realResults) {
       let matchPoints = 0;
@@ -514,7 +520,10 @@
         }
       });
 
-      // 2. Advancing group outcome & Knockouts ONLY calculated if group stage is fully completed
+      // 2. Advancing group outcome & Knockouts.
+      //    Group-advance points (+5) require the real group stage to be fully filled.
+      //    Knockout-stage points are awarded as soon as the admin marks who really advanced
+      //    (no fixed bracket of pairs is used for the real side anymore).
       const isGroupStageFinished = STATIC_MATCHES.every(m => {
         const real = realMatches[m.id];
         return real && real.home !== undefined && real.away !== undefined && real.home !== '' && real.away !== '';
@@ -527,54 +536,55 @@
       let fPoints = 0;
       let champPoints = 0;
 
-      if (isGroupStageFinished) {
-        const realStages = resolveWholeBracket(realMatches, realResults?.ko || {});
-        const predStages = resolveWholeBracket(predMatches, userPred?.ko || {});
+      // Predicted advancement is still derived from the player's own bracket.
+      const predStages = resolveWholeBracket(predMatches, userPred?.ko || {});
 
-        // Clean dummy teams starting with '?' before awarding points
-        const cleanRealR32 = (realStages.r32 || []).filter(code => code && !code.startsWith('?'));
-        const cleanRealR16 = (realStages.r16 || []).filter(code => code && !code.startsWith('?'));
-        const cleanRealQf = (realStages.qf || []).filter(code => code && !code.startsWith('?'));
-        const cleanRealSf = (realStages.sf || []).filter(code => code && !code.startsWith('?'));
-        const cleanRealF = (realStages.f || []).filter(code => code && !code.startsWith('?'));
-        const cleanRealChamp = (realStages.champion && !realStages.champion.startsWith('?')) ? realStages.champion : null;
+      // Real advancement comes from explicit admin selections per stage.
+      const realAdvanced = realResults?.advanced || {};
+      const cleanList = (arr) => (Array.isArray(arr) ? arr : []).filter(code => code && !String(code).startsWith('?'));
 
-        if (cleanRealR32.length > 0) {
-          predStages.r32.forEach(code => {
-            if (cleanRealR32.includes(code)) {
-              groupTeamsPoints += 5;
-              correctAdvancingCount++;
-            }
-          });
-        }
+      const cleanRealR32 = isGroupStageFinished ? cleanList(calculateStandings(realMatches).advancing) : [];
+      const cleanRealR16 = cleanList(realAdvanced.r16);
+      const cleanRealQf = cleanList(realAdvanced.qf);
+      const cleanRealSf = cleanList(realAdvanced.sf);
+      const cleanRealF = cleanList(realAdvanced.f);
+      const cleanRealChamp = (realAdvanced.champion && !String(realAdvanced.champion).startsWith('?')) ? realAdvanced.champion : null;
 
-        if (cleanRealR16.length > 0) {
-          predStages.r16.forEach(code => {
-            if (cleanRealR16.includes(code)) r16Points += 7;
-          });
-        }
+      if (cleanRealR32.length > 0) {
+        predStages.r32.forEach(code => {
+          if (cleanRealR32.includes(code)) {
+            groupTeamsPoints += 5;
+            correctAdvancingCount++;
+          }
+        });
+      }
 
-        if (cleanRealQf.length > 0) {
-          predStages.qf.forEach(code => {
-            if (cleanRealQf.includes(code)) qfPoints += 8;
-          });
-        }
+      if (cleanRealR16.length > 0) {
+        predStages.r16.forEach(code => {
+          if (cleanRealR16.includes(code)) r16Points += 7;
+        });
+      }
 
-        if (cleanRealSf.length > 0) {
-          predStages.sf.forEach(code => {
-            if (cleanRealSf.includes(code)) sfPoints += 9;
-          });
-        }
+      if (cleanRealQf.length > 0) {
+        predStages.qf.forEach(code => {
+          if (cleanRealQf.includes(code)) qfPoints += 8;
+        });
+      }
 
-        if (cleanRealF.length > 0) {
-          predStages.f.forEach(code => {
-            if (cleanRealF.includes(code)) fPoints += 10;
-          });
-        }
+      if (cleanRealSf.length > 0) {
+        predStages.sf.forEach(code => {
+          if (cleanRealSf.includes(code)) sfPoints += 9;
+        });
+      }
 
-        if (cleanRealChamp && predStages.champion === cleanRealChamp) {
-          champPoints = 13;
-        }
+      if (cleanRealF.length > 0) {
+        predStages.f.forEach(code => {
+          if (cleanRealF.includes(code)) fPoints += 10;
+        });
+      }
+
+      if (cleanRealChamp && predStages.champion === cleanRealChamp) {
+        champPoints = 13;
       }
 
       koPoints = r16Points + qfPoints + sfPoints + fPoints + champPoints;
@@ -621,7 +631,7 @@
       const [userId, setUserId] = useState(null);
       const [myProfile, setMyProfile] = useState({ username: '', registered: false });
       const [myPredictions, setMyPredictions] = useState({ matches: {}, ko: {}, submitted: false });
-      const [realResults, setRealResults] = useState({ matches: {}, ko: {} });
+      const [realResults, setRealResults] = useState({ matches: {}, ko: {}, advanced: { r16: [], qf: [], sf: [], f: [], champion: '' } });
       const [allPredictions, setAllPredictions] = useState({});
       const [allUsers, setAllUsers] = useState({});
 
@@ -696,7 +706,7 @@
 
           setMyPredictions(offlinePreds ? JSON.parse(offlinePreds) : { matches: {}, ko: {}, submitted: false });
           setMyProfile(offlineProfile ? JSON.parse(offlineProfile) : { username: '', registered: false });
-          setRealResults(offlineResults ? JSON.parse(offlineResults) : { matches: {}, ko: {} });
+          setRealResults(offlineResults ? JSON.parse(offlineResults) : { matches: {}, ko: {}, advanced: { r16: [], qf: [], sf: [], f: [], champion: '' } });
 
           setAllPredictions({ [userId]: offlinePreds ? JSON.parse(offlinePreds) : { matches: {}, ko: {}, submitted: false } });
           setAllUsers({ [userId]: offlineProfile ? JSON.parse(offlineProfile) : { username: '', registered: false } });
@@ -709,7 +719,7 @@
           if (docSnap.exists) {
             setRealResults(docSnap.data());
           } else {
-            resultsRef.set({ matches: {}, ko: {} });
+            resultsRef.set({ matches: {}, ko: {}, advanced: { r16: [], qf: [], sf: [], f: [], champion: '' } });
           }
         }, err => console.error("Error results sync:", err));
 
@@ -904,10 +914,19 @@
         return resolveWholeBracket(myPredictions.matches || {}, myPredictions.ko || {});
       }, [myPredictions.matches, myPredictions.ko]);
 
-      // --- REAL/ADMIN STAGE BRACKET RESOLUTION ---
-      const realCalculatedBracket = useMemo(() => {
-        return resolveWholeBracket(realResults.matches || {}, realResults.ko || {});
-      }, [realResults.matches, realResults.ko]);
+      // --- REAL/ADMIN ADVANCEMENT RESOLUTION ---
+      // Teams that actually came out of the groups (no fixed bracket of pairs).
+      const realAdvancingList = useMemo(() => {
+        return calculateStandings(realResults.matches || {}).advancing || [];
+      }, [realResults.matches]);
+
+      const realAdvanced = realResults.advanced || { r16: [], qf: [], sf: [], f: [], champion: '' };
+      const realGroupStageFinished = useMemo(() => {
+        return STATIC_MATCHES.every(m => {
+          const real = realResults.matches?.[m.id];
+          return real && real.home !== undefined && real.away !== undefined && real.home !== '' && real.away !== '';
+        });
+      }, [realResults.matches]);
 
       const leaderboard = useMemo(() => {
         const board = Object.keys(allPredictions).map(pId => {
@@ -918,7 +937,7 @@
           return {
             userId: pId,
             username: prof.username || 'Без имени',
-            score: scoreObj.totalPoints,
+            score: getAdjustedTotal(prof.username, scoreObj),
             matchPoints: scoreObj.matchPoints,
             groupPoints: scoreObj.groupTeamsPoints,
             koPoints: scoreObj.koPoints,
@@ -965,11 +984,36 @@
         saveRealResults(updated);
       };
 
-      const handleRealKnockoutAdvance = (matchId, winnerCode) => {
-        const updatedKo = { ...realResults.ko };
-        updatedKo[matchId] = winnerCode;
+      // Toggle a team's presence in a real knockout stage advancement list
+      const handleRealAdvanceToggle = (stage, code) => {
+        const base = realResults.advanced || { r16: [], qf: [], sf: [], f: [], champion: '' };
+        const currentList = Array.isArray(base[stage]) ? base[stage] : [];
+        const exists = currentList.includes(code);
+        const nextList = exists ? currentList.filter(c => c !== code) : [...currentList, code];
 
-        const updated = { ...realResults, ko: updatedKo };
+        const updatedAdvanced = { ...base, [stage]: nextList };
+
+        // If a team is removed from a stage, also drop it from all deeper stages
+        if (exists) {
+          const order = ['r16', 'qf', 'sf', 'f'];
+          const startIdx = order.indexOf(stage);
+          if (startIdx !== -1) {
+            for (let i = startIdx + 1; i < order.length; i++) {
+              const deeper = order[i];
+              updatedAdvanced[deeper] = (Array.isArray(updatedAdvanced[deeper]) ? updatedAdvanced[deeper] : []).filter(c => c !== code);
+            }
+            if (updatedAdvanced.champion === code) updatedAdvanced.champion = '';
+          }
+        }
+
+        const updated = { ...realResults, advanced: updatedAdvanced };
+        saveRealResults(updated);
+      };
+
+      const handleRealChampion = (code) => {
+        const base = realResults.advanced || { r16: [], qf: [], sf: [], f: [], champion: '' };
+        const updatedAdvanced = { ...base, champion: base.champion === code ? '' : code };
+        const updated = { ...realResults, advanced: updatedAdvanced };
         saveRealResults(updated);
       };
 
@@ -994,6 +1038,40 @@
       const renderTeamName = (code) => {
         const t = TEAMS[code];
         return t ? `${t.flag} ${t.name}` : code;
+      };
+
+      // Renders a checklist of teams (sourceCodes) where the admin marks who advanced to `stage`.
+      const renderAdvanceChecklist = (stage, sourceCodes, expectedCount) => {
+        const selectedList = Array.isArray(realAdvanced[stage]) ? realAdvanced[stage] : [];
+        const cleanSource = (sourceCodes || []).filter(code => code && !String(code).startsWith('?'));
+
+        if (cleanSource.length === 0) {
+          return (
+            <p class="text-slate-500 text-xs text-center py-6">
+              Сначала отметьте прошедшие команды на предыдущей стадии (или заполните результаты групп).
+            </p>
+          );
+        }
+
+        return (
+          <div class="space-y-3">
+            <div class="text-[11px] text-slate-400 font-semibold">
+              Отметьте, кто прошёл дальше. Выбрано: <span class="text-emerald-400 font-bold">{selectedList.length}</span>/{expectedCount}
+            </div>
+            <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-2">
+              {cleanSource.map(code => {
+                const t = TEAMS[code] || { code, name: code, flag: '⚽' };
+                const isSel = selectedList.includes(code);
+                return (
+                  <button key={code} onClick={() => handleRealAdvanceToggle(stage, code)} class={`w-full flex justify-between items-center p-2 rounded text-xs font-semibold transition ${isSel ? 'bg-red-500 text-white' : 'bg-slate-950 text-slate-300 border border-slate-800 hover:border-slate-700'}`}>
+                    <span>{t.flag} {t.name}</span>
+                    {isSel && <i class="fa-solid fa-check"></i>}
+                  </button>
+                );
+              })}
+            </div>
+          </div>
+        );
       };
 
       const selectedPlayerDetails = useMemo(() => {
@@ -1082,7 +1160,7 @@
 
                 <div class="flex items-center gap-1.5">
                   <span class="text-xs text-slate-400">Баллы:</span>
-                  <span class="font-black text-yellow-400 text-lg">{myScoreDetails.totalPoints}</span>
+                  <span class="font-black text-yellow-400 text-lg">{getAdjustedTotal(myProfile.username, myScoreDetails)}</span>
                 </div>
 
                 <button 
@@ -1914,133 +1992,76 @@
                     </div>
 
                     <div class="p-4 bg-slate-950 rounded-xl border border-slate-800 space-y-4">
-                      
-                      {/* ADMIN R32 VIEW */}
+
+                      {/* ADMIN R32 VIEW: реально вышедшие из групп (только просмотр) */}
                       {adminKoStageTab === 'R32' && (
-                        <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
-                          {Object.keys(realCalculatedBracket.r32Matches).map((matchId, idx) => {
-                            const [t1, t2] = realCalculatedBracket.r32Matches[matchId];
-                            const selected = realResults.ko?.[matchId];
-
-                            return (
-                              <div key={matchId} class="bg-slate-900 p-3 rounded-xl border border-slate-800 space-y-2">
-                                <span class="text-[10px] text-red-400 font-extrabold uppercase">Пара #{idx+1} (1/16)</span>
-                                <div class="space-y-1.5">
-                                  <button onClick={() => handleRealKnockoutAdvance(matchId, t1.code)} class={`w-full flex justify-between p-2 rounded text-xs font-semibold ${selected === t1.code ? 'bg-red-500 text-white' : 'bg-slate-950 text-slate-300 border border-slate-805'}`}>
-                                    <span>{t1.flag} {t1.name}</span>
-                                    {selected === t1.code && <i class="fa-solid fa-check"></i>}
-                                  </button>
-                                  <button onClick={() => handleRealKnockoutAdvance(matchId, t2.code)} class={`w-full flex justify-between p-2 rounded text-xs font-semibold ${selected === t2.code ? 'bg-red-500 text-white' : 'bg-slate-950 text-slate-300 border border-slate-805'}`}>
-                                    <span>{t2.flag} {t2.name}</span>
-                                    {selected === t2.code && <i class="fa-solid fa-check"></i>}
-                                  </button>
-                                </div>
-                              </div>
-                            );
-                          })}
+                        <div class="space-y-3">
+                          {!realGroupStageFinished && (
+                            <p class="text-amber-400/90 text-[11px] font-semibold bg-amber-500/10 border border-amber-500/20 rounded-lg p-2">
+                              Заполните все результаты групп, чтобы список вышедших стал окончательным. Сейчас показан расчёт по уже введённым матчам.
+                            </p>
+                          )}
+                          <div class="text-[11px] text-slate-400 font-semibold">
+                            Реально вышли из групп: <span class="text-emerald-400 font-bold">{realAdvancingList.filter(c => c && !String(c).startsWith('?')).length}</span> команд(ы)
+                          </div>
+                          {realAdvancingList.filter(c => c && !String(c).startsWith('?')).length === 0 ? (
+                            <p class="text-slate-500 text-xs text-center py-6">Заполните результаты групповых матчей.</p>
+                          ) : (
+                            <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-2">
+                              {realAdvancingList.filter(c => c && !String(c).startsWith('?')).map(code => {
+                                const t = TEAMS[code] || { code, name: code, flag: '⚽' };
+                                return (
+                                  <div key={code} class="flex items-center gap-2 p-2 rounded text-xs font-semibold bg-slate-900 text-slate-300 border border-slate-800">
+                                    <i class="fa-solid fa-circle-check text-emerald-500"></i>
+                                    <span>{t.flag} {t.name}</span>
+                                  </div>
+                                );
+                              })}
+                            </div>
+                          )}
                         </div>
                       )}
 
-                      {/* ADMIN R16 VIEW */}
-                      {adminKoStageTab === 'R16' && (
-                        <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
-                          {Object.keys(realCalculatedBracket.r16Matches).map((matchId, idx) => {
-                            const [t1, t2] = realCalculatedBracket.r16Matches[matchId];
-                            const selected = realResults.ko?.[matchId];
+                      {/* ADMIN R16 VIEW: кто прошёл в 1/8 */}
+                      {adminKoStageTab === 'R16' && renderAdvanceChecklist('r16', realAdvancingList, 16)}
 
-                            return (
-                              <div key={matchId} class="bg-slate-900 p-3 rounded-xl border border-slate-800 space-y-2">
-                                <span class="text-[10px] text-red-400 font-extrabold uppercase">Пара #{idx+1} (1/8)</span>
-                                <div class="space-y-1.5">
-                                  <button onClick={() => handleRealKnockoutAdvance(matchId, t1.code)} class={`w-full flex justify-between p-2 rounded text-xs font-semibold ${selected === t1.code ? 'bg-red-500 text-white' : 'bg-slate-950 text-slate-300 border border-slate-805'}`}>
-                                    <span>{t1.flag} {t1.name}</span>
-                                    {selected === t1.code && <i class="fa-solid fa-check"></i>}
-                                  </button>
-                                  <button onClick={() => handleRealKnockoutAdvance(matchId, t2.code)} class={`w-full flex justify-between p-2 rounded text-xs font-semibold ${selected === t2.code ? 'bg-red-500 text-white' : 'bg-slate-950 text-slate-300 border border-slate-805'}`}>
-                                    <span>{t2.flag} {t2.name}</span>
-                                    {selected === t2.code && <i class="fa-solid fa-check"></i>}
-                                  </button>
-                                </div>
-                              </div>
-                            );
-                          })}
-                        </div>
-                      )}
+                      {/* ADMIN QF VIEW: кто прошёл в 1/4 */}
+                      {adminKoStageTab === 'QF' && renderAdvanceChecklist('qf', realAdvanced.r16, 8)}
 
-                      {/* ADMIN QF VIEW */}
-                      {adminKoStageTab === 'QF' && (
-                        <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
-                          {Object.keys(realCalculatedBracket.qfMatches).map((matchId, idx) => {
-                            const [t1, t2] = realCalculatedBracket.qfMatches[matchId];
-                            const selected = realResults.ko?.[matchId];
+                      {/* ADMIN SF VIEW: кто прошёл в 1/2 */}
+                      {adminKoStageTab === 'SF' && renderAdvanceChecklist('sf', realAdvanced.qf, 4)}
 
-                            return (
-                              <div key={matchId} class="bg-slate-900 p-4 rounded-xl border border-slate-800 space-y-3">
-                                <span class="text-[10px] text-red-400 font-extrabold uppercase">Четвертьфинал {idx+1}</span>
-                                <div class="space-y-2">
-                                  <button onClick={() => handleRealKnockoutAdvance(matchId, t1.code)} class={`w-full flex justify-between p-2 rounded text-xs font-semibold ${selected === t1.code ? 'bg-red-500 text-white' : 'bg-slate-950 text-slate-300 border border-slate-800'}`}>
-                                    <span>{t1 ? `${t1.flag} ${t1.name}` : 'Пусто'}</span>
-                                    {selected === t1?.code && <i class="fa-solid fa-check"></i>}
-                                  </button>
-                                  <button onClick={() => handleRealKnockoutAdvance(matchId, t2.code)} class={`w-full flex justify-between p-2 rounded text-xs font-semibold ${selected === t2.code ? 'bg-red-500 text-white' : 'bg-slate-950 text-slate-300 border border-slate-800'}`}>
-                                    <span>{t2 ? `${t2.flag} ${t2.name}` : 'Пусто'}</span>
-                                    {selected === t2?.code && <i class="fa-solid fa-check"></i>}
-                                  </button>
-                                </div>
-                              </div>
-                            );
-                          })}
-                        </div>
-                      )}
-
-                      {/* ADMIN SF VIEW */}
-                      {adminKoStageTab === 'SF' && (
-                        <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
-                          {Object.keys(realCalculatedBracket.sfMatches).map((matchId, idx) => {
-                            const [t1, t2] = realCalculatedBracket.sfMatches[matchId];
-                            const selected = realResults.ko?.[matchId];
-
-                            return (
-                              <div key={matchId} class="bg-slate-900 p-4 rounded-xl border border-slate-800 space-y-3">
-                                <span class="text-[10px] text-red-400 font-extrabold uppercase">Полуфинал {idx+1}</span>
-                                <div class="space-y-2">
-                                  <button onClick={() => handleRealKnockoutAdvance(matchId, t1.code)} class={`w-full flex justify-between p-2 rounded text-xs font-semibold ${selected === t1.code ? 'bg-red-500 text-white' : 'bg-slate-950 text-slate-300 border border-slate-800'}`}>
-                                    <span>{t1 ? `${t1.flag} ${t1.name}` : 'Пусто'}</span>
-                                    {selected === t1?.code && <i class="fa-solid fa-check"></i>}
-                                  </button>
-                                  <button onClick={() => handleRealKnockoutAdvance(matchId, t2.code)} class={`w-full flex justify-between p-2 rounded text-xs font-semibold ${selected === t2.code ? 'bg-red-500 text-white' : 'bg-slate-950 text-slate-300 border border-slate-800'}`}>
-                                    <span>{t2 ? `${t2.flag} ${t2.name}` : 'Пусто'}</span>
-                                    {selected === t2?.code && <i class="fa-solid fa-check"></i>}
-                                  </button>
-                                </div>
-                              </div>
-                            );
-                          })}
-                        </div>
-                      )}
-
-                      {/* ADMIN F VIEW */}
+                      {/* ADMIN F VIEW: финалисты + чемпион */}
                       {adminKoStageTab === 'F' && (
-                        <div class="max-w-md mx-auto bg-slate-900 p-5 rounded-xl border border-slate-800 space-y-4">
-                          <span class="text-xs text-red-400 font-extrabold uppercase text-center block">Финал</span>
-                          {Object.keys(realCalculatedBracket.finalMatches).map((matchId) => {
-                            const [t1, t2] = realCalculatedBracket.finalMatches[matchId];
-                            const selected = realResults.ko?.[matchId];
+                        <div class="space-y-5">
+                          <div>
+                            <span class="text-xs text-red-400 font-extrabold uppercase block mb-2">Финалисты (кто дошёл до финала)</span>
+                            {renderAdvanceChecklist('f', realAdvanced.sf, 2)}
+                          </div>
 
-                            return (
-                              <div key={matchId} class="space-y-3">
-                                <button onClick={() => handleRealKnockoutAdvance(matchId, t1.code)} class={`w-full flex justify-between p-2.5 rounded text-xs font-semibold ${selected === t1.code ? 'bg-red-500 text-white font-black' : 'bg-slate-950 text-slate-300 border border-slate-800'}`}>
-                                  <span>{t1 ? `${t1.flag} ${t1.name}` : 'Пусто'}</span>
-                                  {selected === t1?.code && <i class="fa-solid fa-crown"></i>}
-                                </button>
-                                <div class="text-center text-[10px] text-slate-500 font-bold">ФАКТИЧЕСКИЙ ЧЕМПИОН ЧМ:</div>
-                                <button onClick={() => handleRealKnockoutAdvance(matchId, t2.code)} class={`w-full flex justify-between p-2.5 rounded text-xs font-semibold ${selected === t2.code ? 'bg-red-500 text-white font-black' : 'bg-slate-950 text-slate-300 border border-slate-800'}`}>
-                                  <span>{t2 ? `${t2.flag} ${t2.name}` : 'Пусто'}</span>
-                                  {selected === t2?.code && <i class="fa-solid fa-crown"></i>}
-                                </button>
-                              </div>
-                            );
-                          })}
+                          <div class="border-t border-slate-800 pt-4">
+                            <span class="text-xs text-red-400 font-extrabold uppercase block mb-2">Фактический чемпион ЧМ</span>
+                            {(() => {
+                              const finalists = (realAdvanced.f || []).filter(c => c && !String(c).startsWith('?'));
+                              if (finalists.length === 0) {
+                                return <p class="text-slate-500 text-xs text-center py-4">Сначала отметьте финалистов выше.</p>;
+                              }
+                              return (
+                                <div class="max-w-md mx-auto space-y-2">
+                                  {finalists.map(code => {
+                                    const t = TEAMS[code] || { code, name: code, flag: '⚽' };
+                                    const isChamp = realAdvanced.champion === code;
+                                    return (
+                                      <button key={code} onClick={() => handleRealChampion(code)} class={`w-full flex justify-between items-center p-2.5 rounded text-xs font-semibold transition ${isChamp ? 'bg-red-500 text-white font-black' : 'bg-slate-950 text-slate-300 border border-slate-800 hover:border-slate-700'}`}>
+                                        <span>{t.flag} {t.name}</span>
+                                        {isChamp && <i class="fa-solid fa-crown"></i>}
+                                      </button>
+                                    );
+                                  })}
+                                </div>
+                              );
+                            })()}
+                          </div>
                         </div>
                       )}
                     </div>
@@ -2061,7 +2082,7 @@
                 <div class="p-5 border-b border-slate-800 flex items-center justify-between">
                   <div>
                     <h3 class="text-lg font-extrabold text-emerald-400">Прогнозы игрока: {selectedPlayerDetails.username}</h3>
-                    <p class="text-xs text-slate-400 mt-1 font-semibold">Итого набранных очков: <span class="font-bold text-yellow-400 text-sm">{selectedPlayerDetails.scoreObj.totalPoints}</span></p>
+                    <p class="text-xs text-slate-400 mt-1 font-semibold">Итого набранных очков: <span class="font-bold text-yellow-400 text-sm">{getAdjustedTotal(selectedPlayerDetails.username, selectedPlayerDetails.scoreObj)}</span></p>
                   </div>
                   <button 
                     onClick={() => setSelectedPlayerDetailId(null)}
